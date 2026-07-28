@@ -163,6 +163,8 @@ docker compose up -d
 - 后续继续开发前，必须先读取 `.codex/PROJECT_RULES.md` 和 `.codex/PROJECT_STATUS.md`。
 - 每完成一个阶段或重要功能后，需要更新 `.codex/PROJECT_STATUS.md`。
 - 不要只依赖聊天上下文记忆项目进度，重要进度必须写回文件。
+- 当 Codex 判断已经新增或完成一个功能、一个阶段时，需要主动询问用户是否进行一次 Git 提交。
+- 除非用户明确要求立即提交，否则完成阶段后不要默认直接提交。
 
 ## 10. 多代理协作规定
 
