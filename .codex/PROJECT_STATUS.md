@@ -430,6 +430,39 @@ D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
 - 不记录客户姓名、联系电话、身份证件、真实配置、Token 等敏感信息
 - 使用 SLF4J 占位符写法
 
+2026-07-28 用户要求套餐数据使用 Redis 缓存，减轻数据库压力，并实现缓存击穿、缓存穿透的通用复用能力。
+
+已新增：
+
+- `backend/src/main/java/com/cmhk/business/common/cache/CacheClient.java`
+
+通用缓存能力：
+
+- 先查 Redis，命中直接返回
+- Redis 未命中时回源数据库并写入 Redis
+- 使用空值缓存防止缓存穿透
+- 使用 Redis 互斥锁防止缓存击穿
+- 缓存 TTL 增加随机抖动，降低大量 key 同时过期风险
+- Redis 异常时记录 warn 日志并降级查询数据库，避免接口直接失败
+
+已接入：
+
+- `MobilePlanServiceImpl.listEnabledPlansWithOffers()`
+- Redis key：`cmhk:mobile-plan:list:enabled`
+- 套餐列表缓存时间：30 分钟
+- 空值缓存时间：2 分钟
+
+验证：
+
+```powershell
+cd D:\cmhkProject\backend
+D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
+```
+
+结果：通过。
+
+注意：本次已完成代码层面接入和单测编译验证，尚未启动 Redis 服务做真实接口缓存命中验证。
+
 ### 2.5 项目协作规定
 
 已创建：
