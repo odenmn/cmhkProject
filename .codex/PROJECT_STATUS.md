@@ -291,6 +291,26 @@ mvn.cmd test
 - `PROJECT_STATUS.md` 不再记录真实数据库密码或带密码命令
 - `application.yml` 不保留真实数据库或 Redis 默认值
 
+2026-07-28 用户要求 Git 提交必须规范，commit message 要简洁清楚，并且提交内容语言使用中文。
+
+已写入 `.codex/PROJECT_RULES.md`：
+
+- 使用 Conventional Commits 格式
+- commit message 使用中文简洁描述
+- 不使用 `更新`、`修复 bug` 等含糊描述
+- 提交前检查暂存区和敏感配置
+- 一次提交对应一个清晰阶段或明确功能
+
+2026-07-28 用户同意将固定子代理角色规范写入项目。
+
+已新增：
+
+- `.codex/agents/git-agent.md`
+- `.codex/agents/progress-agent.md`
+- `.codex/agents/discussion-agent.md`
+
+后续创建临时子代理时，应优先读取这些角色规范。代理实例仍然用完即关闭，项目中只保留角色说明文件。
+
 ### 2.5 项目协作规定
 
 已创建：

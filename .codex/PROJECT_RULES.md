@@ -41,6 +41,7 @@ cmhkProject/
   README.md                面向运行使用的说明
   .codex/PROJECT_RULES.md  面向后续开发协作的规则
   .codex/PROJECT_STATUS.md 面向项目推进阶段的记录
+  .codex/agents/           项目内固定代理角色规范
 ```
 
 后端目录：
@@ -166,3 +167,34 @@ docker compose up -d
 - 进度读取与更新代理负责读取 `.codex/PROJECT_RULES.md` 和 `.codex/PROJECT_STATUS.md`，检查进度缺口并输出更新建议。
 - 任务讨论代理负责整理需求问题、优先级、接口/表设计和页面任务，不直接修改代码。
 - 子代理摘要回来后，主代理负责整合结论、执行必要修改，并保持主上下文简洁。
+- 项目内固定代理角色规范写在 `.codex/agents/` 下。
+- 创建临时子代理时，应优先读取对应角色规范文件：
+  - `.codex/agents/git-agent.md`
+  - `.codex/agents/progress-agent.md`
+  - `.codex/agents/discussion-agent.md`
+- 代理规范文件可以提交到 Git；运行中的临时子代理用完后仍需关闭。
+
+## 11. Git 提交规范
+
+- Git 提交必须规范，commit message 要简洁、清楚，能直接看出本次改动目的。
+- 优先使用 Conventional Commits 格式，但说明内容使用中文：
+  - `feat: 新增移动套餐选择流程`
+  - `fix: 修复移动套餐订单校验`
+  - `docs: 更新项目进度记录`
+  - `chore: 调整 Git 忽略规则`
+  - `refactor: 简化移动套餐服务逻辑`
+- 常用类型：
+  - `feat`：新增功能
+  - `fix`：修复问题
+  - `docs`：文档修改
+  - `style`：样式或格式修改，不影响逻辑
+  - `refactor`：重构，不改变行为
+  - `test`：测试相关
+  - `chore`：构建、配置、依赖、杂项维护
+- commit message 使用中文简洁描述，首行建议不超过 72 个字符。
+- 不要使用含糊信息，例如 `更新`、`修复 bug`、`改文件`。
+- 提交前必须检查：
+  - `git status --short`
+  - 暂存区是否包含不该提交的文件
+  - `application-local.yml`、`.env`、`node_modules`、`dist`、`target` 等是否未被提交
+- 一次提交尽量对应一个清晰阶段或一个明确功能，不把无关改动混在一起。
