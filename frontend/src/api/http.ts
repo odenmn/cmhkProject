@@ -21,11 +21,32 @@ export interface MobilePlan {
   id: number
   planCode: string
   planName: string
+  planType: string
   monthlyFee: number
+  channelPriceText: string
+  effectiveMonthlyFee?: number
+  effectivePriceText?: string
+  officialMonthlyFee?: number
+  officialPriceText?: string
   dataQuota: string
   voiceQuota: string
+  roamingBenefit?: string
   contractPeriod: string
+  promotionEndDate?: string
+  sourceVersion?: string
+  discountFormula?: string
   description: string
+  sortOrder: number
+  enabled: number
+  offers?: MobilePlanOffer[]
+}
+
+export interface MobilePlanOffer {
+  id: number
+  planCode: string
+  offerType: string
+  offerName: string
+  offerValue: string
   sortOrder: number
   enabled: number
 }
@@ -42,7 +63,19 @@ export interface MobilePlanOrder {
   orderNo: string
   planCode: string
   planName: string
+  planType?: string
   monthlyFee: number
+  channelPriceText?: string
+  effectiveMonthlyFee?: number
+  effectivePriceText?: string
+  officialMonthlyFee?: number
+  officialPriceText?: string
+  dataQuota?: string
+  voiceQuota?: string
+  roamingBenefit?: string
+  contractPeriod?: string
+  promotionEndDate?: string
+  discountFormula?: string
   customerName: string
   contactPhone: string
   remark: string

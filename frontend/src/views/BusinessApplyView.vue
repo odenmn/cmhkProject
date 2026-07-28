@@ -11,39 +11,57 @@ const plans = ref<MobilePlan[]>([])
 const fallbackPlans: MobilePlan[] = [
   {
     id: 1,
-    planCode: 'CMHK_5G_128',
-    planName: '5G 畅享 128 套餐',
-    monthlyFee: 128,
-    dataQuota: '30GB 本地数据',
-    voiceQuota: '1000 分钟本地通话',
-    contractPeriod: '12 个月',
-    description: '适合日常通讯、视频和社交使用。',
-    sortOrder: 10,
-    enabled: 1
+    planCode: 'STUDENT_SLASH_30GB_24M',
+    planName: '学生 Slash 30GB',
+    planType: '学生套餐',
+    monthlyFee: 98,
+    channelPriceText: 'HK$98/月',
+    effectiveMonthlyFee: 62,
+    effectivePriceText: '约HK$62/月',
+    officialMonthlyFee: 98,
+    officialPriceText: 'HK$98/月',
+    dataQuota: '30GB',
+    voiceQuota: '香港本地无限通话',
+    roamingBenefit: '赠3GB',
+    contractPeriod: '24个月',
+    promotionEndDate: '2026-07-31',
+    sourceVersion: '202607',
+    discountFormula: '(HK$98 x 24个月 - HK$600话费券 - HK$260渠道补贴) / 24个月',
+    description: '留学生上台优惠，24 个月折实月费更低。',
+    sortOrder: 30,
+    enabled: 1,
+    offers: [
+      { id: 1, planCode: 'STUDENT_SLASH_30GB_24M', offerType: 'POINTS', offerName: '积分合计', offerValue: '共60,000分，可抵HK$600话费券', sortOrder: 10, enabled: 1 },
+      { id: 2, planCode: 'STUDENT_SLASH_30GB_24M', offerType: 'SUBSIDY', offerName: '渠道额外补贴', offerValue: 'HK$260', sortOrder: 20, enabled: 1 },
+      { id: 3, planCode: 'STUDENT_SLASH_30GB_24M', offerType: 'SOCIAL_DATA', offerName: '社交娱乐数据', offerValue: 'WhatsApp、WeChat、YouTube、Netflix 等', sortOrder: 30, enabled: 1 }
+    ]
   },
   {
     id: 2,
-    planCode: 'CMHK_5G_198',
-    planName: '5G 畅享 198 套餐',
-    monthlyFee: 198,
-    dataQuota: '80GB 本地数据',
-    voiceQuota: '2000 分钟本地通话',
-    contractPeriod: '12 个月',
-    description: '适合高频上网、热点共享和商务使用。',
-    sortOrder: 20,
-    enabled: 1
-  },
-  {
-    id: 3,
-    planCode: 'CMHK_5G_298',
-    planName: '5G 尊享 298 套餐',
-    monthlyFee: 298,
-    dataQuota: '150GB 本地数据',
-    voiceQuota: '无限本地通话',
-    contractPeriod: '24 个月',
-    description: '适合重度数据用户和家庭共享场景。',
-    sortOrder: 30,
-    enabled: 1
+    planCode: 'STUDENT_SLASH_50GB_24M',
+    planName: '学生 Slash 50GB',
+    planType: '学生套餐',
+    monthlyFee: 138,
+    channelPriceText: 'HK$138/月',
+    effectiveMonthlyFee: 102,
+    effectivePriceText: '约HK$102/月',
+    officialMonthlyFee: 138,
+    officialPriceText: 'HK$138/月',
+    dataQuota: '50GB + 限时额外50GB，最高100GB 香港本地数据',
+    voiceQuota: '香港本地无限通话',
+    roamingBenefit: '最高6GB 中国内地及澳门数据',
+    contractPeriod: '24个月',
+    promotionEndDate: '2026-07-31',
+    sourceVersion: '202607',
+    discountFormula: '(HK$138 x 24个月 - HK$600电子缴费券 - HK$260渠道补贴) / 24个月',
+    description: '秋季校园优惠主推款，适合学生长期使用。',
+    sortOrder: 50,
+    enabled: 1,
+    offers: [
+      { id: 4, planCode: 'STUDENT_SLASH_50GB_24M', offerType: 'POINTS', offerName: '积分合计', offerValue: '60,000分，可抵HK$600电子缴费券', sortOrder: 10, enabled: 1 },
+      { id: 5, planCode: 'STUDENT_SLASH_50GB_24M', offerType: 'SUBSIDY', offerName: '渠道额外补贴', offerValue: 'HK$260', sortOrder: 20, enabled: 1 },
+      { id: 6, planCode: 'STUDENT_SLASH_50GB_24M', offerType: 'SUBSIDY', offerName: '购机补贴', offerValue: 'HK$600', sortOrder: 30, enabled: 1 }
+    ]
   }
 ]
 
@@ -64,6 +82,10 @@ onMounted(async () => {
   }
 })
 
+function displayPrice(plan: MobilePlan) {
+  return plan.effectivePriceText || plan.channelPriceText || `HK$${plan.monthlyFee}/月`
+}
+
 function selectPlan(plan: MobilePlan) {
   router.push({
     name: 'business-confirm',
@@ -73,10 +95,16 @@ function selectPlan(plan: MobilePlan) {
     query: {
       planCode: plan.planCode,
       planName: plan.planName,
+      planType: plan.planType,
       monthlyFee: String(plan.monthlyFee),
+      channelPriceText: plan.channelPriceText,
+      effectivePriceText: plan.effectivePriceText || '',
       dataQuota: plan.dataQuota,
       voiceQuota: plan.voiceQuota,
-      contractPeriod: plan.contractPeriod
+      roamingBenefit: plan.roamingBenefit || '',
+      contractPeriod: plan.contractPeriod,
+      promotionEndDate: plan.promotionEndDate || '',
+      discountFormula: plan.discountFormula || ''
     }
   })
 }
@@ -106,18 +134,28 @@ function selectPlan(plan: MobilePlan) {
         <article v-for="plan in plans" :key="plan.planCode" class="plan-card">
           <div class="plan-head">
             <div>
-              <p class="eyebrow">{{ plan.contractPeriod }}</p>
+              <p class="eyebrow">{{ plan.planType }} · {{ plan.contractPeriod }}</p>
               <h2>{{ plan.planName }}</h2>
             </div>
             <div class="price-block">
-              <strong>${{ plan.monthlyFee }}</strong>
-              <span>/月</span>
+              <strong>{{ displayPrice(plan) }}</strong>
+              <span v-if="plan.effectivePriceText">原价 {{ plan.channelPriceText }}</span>
             </div>
           </div>
+
           <div class="plan-features">
             <span>{{ plan.dataQuota }}</span>
             <span>{{ plan.voiceQuota }}</span>
+            <span v-if="plan.roamingBenefit">{{ plan.roamingBenefit }}</span>
+            <span v-if="plan.promotionEndDate">优惠至 {{ plan.promotionEndDate }}</span>
           </div>
+
+          <div v-if="plan.offers?.length" class="offer-list">
+            <span v-for="offer in plan.offers.slice(0, 4)" :key="offer.id">
+              {{ offer.offerName }}：{{ offer.offerValue }}
+            </span>
+          </div>
+
           <p class="plan-desc">{{ plan.description }}</p>
           <button class="primary-button full" type="button" @click="selectPlan(plan)">选择此套餐</button>
         </article>
@@ -125,4 +163,3 @@ function selectPlan(plan: MobilePlan) {
     </div>
   </main>
 </template>
-

@@ -38,7 +38,19 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
         order.setOrderNo(generateOrderNo());
         order.setPlanCode(plan.getPlanCode());
         order.setPlanName(plan.getPlanName());
+        order.setPlanType(plan.getPlanType());
         order.setMonthlyFee(plan.getMonthlyFee());
+        order.setChannelPriceText(plan.getChannelPriceText());
+        order.setEffectiveMonthlyFee(plan.getEffectiveMonthlyFee());
+        order.setEffectivePriceText(plan.getEffectivePriceText());
+        order.setOfficialMonthlyFee(plan.getOfficialMonthlyFee());
+        order.setOfficialPriceText(plan.getOfficialPriceText());
+        order.setDataQuota(plan.getDataQuota());
+        order.setVoiceQuota(plan.getVoiceQuota());
+        order.setRoamingBenefit(plan.getRoamingBenefit());
+        order.setContractPeriod(plan.getContractPeriod());
+        order.setPromotionEndDate(plan.getPromotionEndDate());
+        order.setDiscountFormula(plan.getDiscountFormula());
         order.setCustomerName(request.getCustomerName());
         order.setContactPhone(request.getContactPhone());
         order.setRemark(request.getRemark());
@@ -53,4 +65,3 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
         return "MP" + time + random;
     }
 }
-

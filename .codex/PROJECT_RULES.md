@@ -75,6 +75,10 @@ frontend/src/
 - 数据库字段使用下划线命名，Java 属性使用驼峰命名。
 - 新增业务表时，同时维护 `backend/src/main/resources/db/schema.sql`。
 - 不在 Controller 中堆复杂业务逻辑。
+- 之后新增或修改 Controller 时，必须使用 SLF4J 添加关键日志：
+  - 记录接口进入、关键查询数量、关键业务结果
+  - 不记录客户姓名、联系电话、身份证件、数据库密码、Redis 密码、Token 等敏感信息
+  - 日志使用占位符写法，例如 `log.info("查询移动套餐完成，数量={}", plans.size())`
 - `backend/src/main/resources/application.yml` 可以提交，但不能写任何真实本机配置，包括数据库地址、账号、密码、Redis 地址、Redis 密码、第三方服务地址、密钥、Token 等。
 - 所有真实本机配置统一写入 `backend/src/main/resources/application-local.yml`，该文件必须被 `.gitignore` 忽略，不提交。
 - 如需说明本机配置格式，维护 `backend/src/main/resources/application-local.example.yml`。
@@ -166,12 +170,14 @@ docker compose up -d
 - Git 提交代理负责检查提交范围、忽略规则、提交风险和建议提交信息；除非用户明确要求，不直接提交。
 - 进度读取与更新代理负责读取 `.codex/PROJECT_RULES.md` 和 `.codex/PROJECT_STATUS.md`，检查进度缺口并输出更新建议。
 - 任务讨论代理负责整理需求问题、优先级、接口/表设计和页面任务，不直接修改代码。
+- 测试代理负责独立执行或规划前端构建、后端测试、接口验证、移动端页面检查，并只输出干净测试摘要。
 - 子代理摘要回来后，主代理负责整合结论、执行必要修改，并保持主上下文简洁。
 - 项目内固定代理角色规范写在 `.codex/agents/` 下。
 - 创建临时子代理时，应优先读取对应角色规范文件：
   - `.codex/agents/git-agent.md`
   - `.codex/agents/progress-agent.md`
   - `.codex/agents/discussion-agent.md`
+  - `.codex/agents/test-agent.md`
 - 代理规范文件可以提交到 Git；运行中的临时子代理用完后仍需关闭。
 
 ## 11. Git 提交规范

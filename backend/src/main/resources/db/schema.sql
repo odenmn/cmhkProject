@@ -31,10 +31,20 @@ CREATE TABLE IF NOT EXISTS mobile_plan (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     plan_code VARCHAR(64) NOT NULL UNIQUE,
     plan_name VARCHAR(128) NOT NULL,
+    plan_type VARCHAR(64) NOT NULL,
     monthly_fee DECIMAL(10, 2) NOT NULL,
-    data_quota VARCHAR(64) NOT NULL,
-    voice_quota VARCHAR(64) NOT NULL,
-    contract_period VARCHAR(64) NOT NULL,
+    channel_price_text VARCHAR(64) NOT NULL,
+    effective_monthly_fee DECIMAL(10, 2),
+    effective_price_text VARCHAR(64),
+    official_monthly_fee DECIMAL(10, 2),
+    official_price_text VARCHAR(64),
+    data_quota VARCHAR(128) NOT NULL,
+    voice_quota VARCHAR(128),
+    roaming_benefit VARCHAR(128),
+    contract_period VARCHAR(64),
+    promotion_end_date DATE,
+    source_version VARCHAR(32),
+    discount_formula VARCHAR(512),
     description VARCHAR(512),
     sort_order INT NOT NULL DEFAULT 0,
     enabled TINYINT NOT NULL DEFAULT 1,
@@ -42,28 +52,159 @@ CREATE TABLE IF NOT EXISTS mobile_plan (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP PROCEDURE IF EXISTS add_column_if_missing;
+
+DELIMITER //
+CREATE PROCEDURE add_column_if_missing(
+    IN target_table VARCHAR(64),
+    IN target_column VARCHAR(64),
+    IN column_definition VARCHAR(512),
+    IN after_column VARCHAR(64)
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = target_table
+          AND column_name = target_column
+    ) THEN
+        SET @ddl = CONCAT(
+            'ALTER TABLE ', target_table,
+            ' ADD COLUMN ', target_column, ' ', column_definition,
+            IF(after_column IS NULL OR after_column = '', '', CONCAT(' AFTER ', after_column))
+        );
+        PREPARE stmt FROM @ddl;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END//
+DELIMITER ;
+
+CALL add_column_if_missing('mobile_plan', 'plan_type', 'VARCHAR(64) NOT NULL DEFAULT ''移动套餐''', 'plan_name');
+CALL add_column_if_missing('mobile_plan', 'channel_price_text', 'VARCHAR(64) NOT NULL DEFAULT ''''', 'monthly_fee');
+CALL add_column_if_missing('mobile_plan', 'effective_monthly_fee', 'DECIMAL(10, 2) NULL', 'channel_price_text');
+CALL add_column_if_missing('mobile_plan', 'effective_price_text', 'VARCHAR(64) NULL', 'effective_monthly_fee');
+CALL add_column_if_missing('mobile_plan', 'official_monthly_fee', 'DECIMAL(10, 2) NULL', 'effective_price_text');
+CALL add_column_if_missing('mobile_plan', 'official_price_text', 'VARCHAR(64) NULL', 'official_monthly_fee');
+CALL add_column_if_missing('mobile_plan', 'roaming_benefit', 'VARCHAR(128) NULL', 'voice_quota');
+CALL add_column_if_missing('mobile_plan', 'promotion_end_date', 'DATE NULL', 'contract_period');
+CALL add_column_if_missing('mobile_plan', 'source_version', 'VARCHAR(32) NULL', 'promotion_end_date');
+CALL add_column_if_missing('mobile_plan', 'discount_formula', 'VARCHAR(512) NULL', 'source_version');
+
 INSERT INTO mobile_plan (
     plan_code,
     plan_name,
+    plan_type,
     monthly_fee,
+    channel_price_text,
+    effective_monthly_fee,
+    effective_price_text,
+    official_monthly_fee,
+    official_price_text,
     data_quota,
     voice_quota,
+    roaming_benefit,
     contract_period,
+    promotion_end_date,
+    source_version,
+    discount_formula,
     description,
     sort_order,
     enabled
 )
 VALUES
-    ('CMHK_5G_128', '5G 畅享 128 套餐', 128.00, '30GB 本地数据', '1000 分钟本地通话', '12 个月', '适合日常通讯、视频和社交使用。', 10, 1),
-    ('CMHK_5G_198', '5G 畅享 198 套餐', 198.00, '80GB 本地数据', '2000 分钟本地通话', '12 个月', '适合高频上网、热点共享和商务使用。', 20, 1),
-    ('CMHK_5G_298', '5G 尊享 298 套餐', 298.00, '150GB 本地数据', '无限本地通话', '24 个月', '适合重度数据用户和家庭共享场景。', 30, 1)
+    ('ONE_CARD_TWO_PLACE_5G_50GB_24M', '一卡两地 5G 50GB', '一卡两地', 179.00, 'HK$179/月', NULL, NULL, 179.00, 'HK$179/月', '50GB 两地共用', '香港本地无限通话', '内地 200 分钟/月', '24个月', '2026-07-31', '202607', NULL, '适合需要香港与内地两地流量、通话权益的客户。', 10, 1),
+    ('HK_LOCAL_5G_100GB_24M', '香港本地 5G 100GB', '香港本地', 149.00, 'HK$149/月', NULL, NULL, 149.00, 'HK$149/月', '香港本地 100GB', '香港本地无限通话', '2GB', '24个月', '2026-07-31', '202607', NULL, '适合主要在香港本地使用大流量的客户。', 20, 1),
+    ('STUDENT_SLASH_30GB_24M', '学生 Slash 30GB', '学生套餐', 98.00, 'HK$98/月', 62.00, '约HK$62/月', 98.00, 'HK$98/月', '30GB', '香港本地无限通话', '赠3GB', '24个月', '2026-07-31', '202607', '(HK$98 x 24个月 - HK$600话费券 - HK$260渠道补贴) / 24个月', '留学生上台优惠，24 个月折实月费更低。', 30, 1),
+    ('STUDENT_SLASH_30GB_12M', '学生 Slash 30GB', '学生套餐', 118.00, 'HK$118/月', 71.00, '约HK$71/月', 118.00, 'HK$118/月', '30GB', '香港本地无限通话', '赠3GB', '12个月', '2026-07-31', '202607', '(HK$118 x 12个月 - HK$400话费券 - HK$168渠道补贴) / 12个月', '留学生上台优惠，12 个月合约更灵活。', 40, 1),
+    ('STUDENT_SLASH_50GB_24M', '学生 Slash 50GB', '学生套餐', 138.00, 'HK$138/月', 102.00, '约HK$102/月', 138.00, 'HK$138/月', '50GB + 限时额外50GB，最高100GB 香港本地数据', '香港本地无限通话', '中国内地及澳门数据4GB + 限时额外2GB，最高6GB', '24个月', '2026-07-31', '202607', '(HK$138 x 24个月 - HK$600电子缴费券 - HK$260渠道补贴) / 24个月', '秋季校园优惠主推款，适合学生长期使用。', 50, 1),
+    ('STUDENT_SLASH_50GB_12M', '学生 Slash 50GB', '学生套餐', 158.00, 'HK$158/月', 105.00, '约HK$105/月', 158.00, 'HK$158/月', '50GB + 限时额外50GB，最高100GB 香港本地数据', '香港本地无限通话', '中国内地及澳门数据4GB + 限时额外2GB，最高6GB', '12个月', '2026-07-31', '202607', '(HK$158 x 12个月 - HK$400电子缴费券 - HK$240渠道补贴) / 12个月', '秋季校园优惠 12 个月方案，适合短期留学客户。', 60, 1),
+    ('ONE_CARD_TWO_PLACE_5G_100GB_24M', '一卡两地 5G 100GB', '一卡两地', 249.00, 'HK$249/月', NULL, NULL, 249.00, 'HK$249/月', '100GB 两地共用', '香港本地无限通话', '内地500分钟/月', '24个月', '2026-07-31', '202607', NULL, '适合两地高频使用的中高流量客户。', 70, 1),
+    ('ONE_CARD_TWO_PLACE_5G_200GB_24M', '一卡两地 5G 200GB', '一卡两地', 399.00, 'HK$399/月', NULL, NULL, 399.00, 'HK$399/月', '200GB 两地共用', '香港本地无限通话', '内地500分钟/月', '24个月', '2026-07-31', '202607', NULL, '适合两地重度数据使用客户。', 80, 1),
+    ('STAFF_ONE_CARD_TWO_PLACE_5G_50GB_24M', 'company staff 一卡两地 5G 50GB', '员工一卡两地', 159.00, 'HK$159/月', NULL, NULL, 159.00, 'HK$159/月', '50GB 两地共用', '香港本地无限通话', '内地200 分钟/月', '24个月', '2026-07-31', '202607', NULL, '员工渠道一卡两地 50GB 优惠方案。', 90, 1),
+    ('STAFF_ONE_CARD_TWO_PLACE_5G_100GB_24M', 'company staff 一卡两地 5G 100GB', '员工一卡两地', 229.00, 'HK$229/月', NULL, NULL, 229.00, 'HK$229/月', '100GB 两地共用', '香港本地无限通话', '内地500分钟/月', '24个月', '2026-07-31', '202607', NULL, '员工渠道一卡两地 100GB 优惠方案。', 100, 1),
+    ('ONE_CARD_THREE_PLACE_5G_30GB_24M', '一卡三地 5G 30GB', '一卡三地', 199.00, 'HK$199/月', NULL, NULL, 199.00, 'HK$199/月', '30GB 三地共用', '香港本地无限通话', '漫游通话 200 分钟/月', '24个月', '2026-07-31', '202607', NULL, '适合香港、内地及海外三地通信用量客户。', 110, 1),
+    ('ONE_CARD_THREE_PLACE_5G_60GB_24M', '一卡三地 5G 60GB', '一卡三地', 239.00, 'HK$239/月', NULL, NULL, 239.00, 'HK$239/月', '60GB 三地共用', '香港本地无限通话', '漫游通话200 分钟/月', '24个月', '2026-07-31', '202607', NULL, '适合三地通信用量较高客户。', 120, 1),
+    ('STAFF_ONE_CARD_THREE_PLACE_5G_60GB_24M', 'company staff 一卡三地 5G 60GB', '员工一卡三地', 219.00, 'HK$219/月', NULL, NULL, 239.00, 'HK$239/月', '60GB 三地共用', '香港本地无限通话', '漫游通话200 分钟/月', '24个月', '2026-07-31', '202607', NULL, '员工渠道一卡三地 60GB 优惠方案。', 130, 1),
+    ('STAFF_ONE_CARD_THREE_PLACE_5G_30GB_24M', 'company staff 一卡三地 5G 30GB', '员工一卡三地', 179.00, 'HK$179/月', NULL, NULL, 199.00, 'HK$199/月', '30GB 三地共用', '香港本地无限通话', '漫游通话200 分钟/月', '24个月', '2026-07-31', '202607', NULL, '员工渠道一卡三地 30GB 优惠方案。', 140, 1)
 ON DUPLICATE KEY UPDATE
     plan_name = VALUES(plan_name),
+    plan_type = VALUES(plan_type),
     monthly_fee = VALUES(monthly_fee),
+    channel_price_text = VALUES(channel_price_text),
+    effective_monthly_fee = VALUES(effective_monthly_fee),
+    effective_price_text = VALUES(effective_price_text),
+    official_monthly_fee = VALUES(official_monthly_fee),
+    official_price_text = VALUES(official_price_text),
     data_quota = VALUES(data_quota),
     voice_quota = VALUES(voice_quota),
+    roaming_benefit = VALUES(roaming_benefit),
     contract_period = VALUES(contract_period),
+    promotion_end_date = VALUES(promotion_end_date),
+    source_version = VALUES(source_version),
+    discount_formula = VALUES(discount_formula),
     description = VALUES(description),
+    sort_order = VALUES(sort_order),
+    enabled = VALUES(enabled);
+
+UPDATE mobile_plan
+SET enabled = 0
+WHERE plan_code IN ('CMHK_5G_128', 'CMHK_5G_198', 'CMHK_5G_298');
+
+CREATE TABLE IF NOT EXISTS mobile_plan_offer (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    plan_code VARCHAR(64) NOT NULL,
+    offer_type VARCHAR(64) NOT NULL,
+    offer_name VARCHAR(128) NOT NULL,
+    offer_value VARCHAR(256) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_mobile_plan_offer (plan_code, offer_type, offer_name),
+    INDEX idx_mobile_plan_offer_plan_code (plan_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO mobile_plan_offer (plan_code, offer_type, offer_name, offer_value, sort_order, enabled)
+VALUES
+    ('STUDENT_SLASH_30GB_24M', 'EXTRA_DATA', '内地及澳门数据', '赠3GB', 10, 1),
+    ('STUDENT_SLASH_30GB_24M', 'VOICE', '香港通话', '无限通话', 20, 1),
+    ('STUDENT_SLASH_30GB_24M', 'VOICE', '内地通话', '50分钟免费通话', 30, 1),
+    ('STUDENT_SLASH_30GB_24M', 'FEE_WAIVER', '学生新上台', '免行政费', 40, 1),
+    ('STUDENT_SLASH_30GB_24M', 'POINTS', '官方积分', '30,000 MyLink', 50, 1),
+    ('STUDENT_SLASH_30GB_24M', 'POINTS', '推荐积分', '30,000 MyLink', 60, 1),
+    ('STUDENT_SLASH_30GB_24M', 'POINTS', '积分合计', '共60,000分，可抵HK$600话费券', 70, 1),
+    ('STUDENT_SLASH_30GB_24M', 'SUBSIDY', '渠道额外补贴', 'HK$260', 80, 1),
+    ('STUDENT_SLASH_30GB_24M', 'SOCIAL_DATA', '社交及娱乐数据组合', 'WhatsApp、WeChat、LINE、Telegram、Zoom、Teams、YouTube、Netflix、Apple TV、Facebook、TikTok、Instagram 等', 90, 1),
+    ('STUDENT_SLASH_30GB_12M', 'EXTRA_DATA', '内地及澳门数据', '赠3GB', 10, 1),
+    ('STUDENT_SLASH_30GB_12M', 'VOICE', '香港通话', '无限通话', 20, 1),
+    ('STUDENT_SLASH_30GB_12M', 'VOICE', '内地通话', '50分钟免费通话', 30, 1),
+    ('STUDENT_SLASH_30GB_12M', 'FEE_WAIVER', '学生新上台', '免行政费', 40, 1),
+    ('STUDENT_SLASH_30GB_12M', 'POINTS', '官方积分', '20,000 MyLink', 50, 1),
+    ('STUDENT_SLASH_30GB_12M', 'POINTS', '推荐积分', '20,000 MyLink', 60, 1),
+    ('STUDENT_SLASH_30GB_12M', 'POINTS', '积分合计', '共40,000分，可抵HK$400话费券', 70, 1),
+    ('STUDENT_SLASH_30GB_12M', 'SUBSIDY', '渠道额外补贴', 'HK$168', 80, 1),
+    ('STUDENT_SLASH_30GB_12M', 'SOCIAL_DATA', '社交及娱乐数据组合', 'WhatsApp、WeChat、LINE、Telegram、Zoom、Teams、YouTube、Netflix、Apple TV、Facebook、TikTok、Instagram 等', 90, 1),
+    ('STUDENT_SLASH_50GB_24M', 'EXTRA_DATA', '香港本地数据', '50GB + 限时额外50GB，最高100GB', 10, 1),
+    ('STUDENT_SLASH_50GB_24M', 'EXTRA_DATA', '中国内地及澳门数据', '4GB + 限时额外2GB，最高6GB', 20, 1),
+    ('STUDENT_SLASH_50GB_24M', 'FEE_WAIVER', '学生新上台', '免行政费', 30, 1),
+    ('STUDENT_SLASH_50GB_24M', 'POINTS', 'MyLink积分', '30,000分', 40, 1),
+    ('STUDENT_SLASH_50GB_24M', 'POINTS', '推荐人号码积分', '30,000分', 50, 1),
+    ('STUDENT_SLASH_50GB_24M', 'POINTS', '积分合计', '60,000分，可抵HK$600电子缴费券', 60, 1),
+    ('STUDENT_SLASH_50GB_24M', 'SUBSIDY', '渠道额外补贴', 'HK$260', 70, 1),
+    ('STUDENT_SLASH_50GB_24M', 'SUBSIDY', '购机补贴', 'HK$600', 80, 1),
+    ('STUDENT_SLASH_50GB_24M', 'SCENE', '适用场景', '日常上课、社交、导航、睇片及两地往返使用', 90, 1),
+    ('STUDENT_SLASH_50GB_12M', 'EXTRA_DATA', '香港本地数据', '50GB + 限时额外50GB，最高100GB', 10, 1),
+    ('STUDENT_SLASH_50GB_12M', 'EXTRA_DATA', '中国内地及澳门数据', '4GB + 限时额外2GB，最高6GB', 20, 1),
+    ('STUDENT_SLASH_50GB_12M', 'FEE_WAIVER', '学生新上台', '免行政费', 30, 1),
+    ('STUDENT_SLASH_50GB_12M', 'POINTS', 'MyLink积分', '20,000分', 40, 1),
+    ('STUDENT_SLASH_50GB_12M', 'POINTS', '推荐人号码积分', '20,000分', 50, 1),
+    ('STUDENT_SLASH_50GB_12M', 'POINTS', '积分合计', '40,000分，可抵HK$400电子缴费券', 60, 1),
+    ('STUDENT_SLASH_50GB_12M', 'SUBSIDY', '渠道额外补贴', 'HK$240', 70, 1),
+    ('STUDENT_SLASH_50GB_12M', 'SCENE', '适用场景', '日常上课、社交、导航、睇片及两地往返使用', 80, 1)
+ON DUPLICATE KEY UPDATE
+    offer_value = VALUES(offer_value),
     sort_order = VALUES(sort_order),
     enabled = VALUES(enabled);
 
@@ -72,7 +213,19 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     order_no VARCHAR(64) NOT NULL UNIQUE,
     plan_code VARCHAR(64) NOT NULL,
     plan_name VARCHAR(128) NOT NULL,
+    plan_type VARCHAR(64),
     monthly_fee DECIMAL(10, 2) NOT NULL,
+    channel_price_text VARCHAR(64),
+    effective_monthly_fee DECIMAL(10, 2),
+    effective_price_text VARCHAR(64),
+    official_monthly_fee DECIMAL(10, 2),
+    official_price_text VARCHAR(64),
+    data_quota VARCHAR(128),
+    voice_quota VARCHAR(128),
+    roaming_benefit VARCHAR(128),
+    contract_period VARCHAR(64),
+    promotion_end_date DATE,
+    discount_formula VARCHAR(512),
     customer_name VARCHAR(64),
     contact_phone VARCHAR(32) NOT NULL,
     remark VARCHAR(512),
@@ -82,3 +235,18 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     INDEX idx_mobile_plan_order_plan_code (plan_code),
     INDEX idx_mobile_plan_order_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CALL add_column_if_missing('mobile_plan_order', 'plan_type', 'VARCHAR(64) NULL', 'plan_name');
+CALL add_column_if_missing('mobile_plan_order', 'channel_price_text', 'VARCHAR(64) NULL', 'monthly_fee');
+CALL add_column_if_missing('mobile_plan_order', 'effective_monthly_fee', 'DECIMAL(10, 2) NULL', 'channel_price_text');
+CALL add_column_if_missing('mobile_plan_order', 'effective_price_text', 'VARCHAR(64) NULL', 'effective_monthly_fee');
+CALL add_column_if_missing('mobile_plan_order', 'official_monthly_fee', 'DECIMAL(10, 2) NULL', 'effective_price_text');
+CALL add_column_if_missing('mobile_plan_order', 'official_price_text', 'VARCHAR(64) NULL', 'official_monthly_fee');
+CALL add_column_if_missing('mobile_plan_order', 'data_quota', 'VARCHAR(128) NULL', 'official_price_text');
+CALL add_column_if_missing('mobile_plan_order', 'voice_quota', 'VARCHAR(128) NULL', 'data_quota');
+CALL add_column_if_missing('mobile_plan_order', 'roaming_benefit', 'VARCHAR(128) NULL', 'voice_quota');
+CALL add_column_if_missing('mobile_plan_order', 'contract_period', 'VARCHAR(64) NULL', 'roaming_benefit');
+CALL add_column_if_missing('mobile_plan_order', 'promotion_end_date', 'DATE NULL', 'contract_period');
+CALL add_column_if_missing('mobile_plan_order', 'discount_formula', 'VARCHAR(512) NULL', 'promotion_end_date');
+
+DROP PROCEDURE IF EXISTS add_column_if_missing;

@@ -9,6 +9,7 @@
 
 - 阶段：项目基础结构搭建中
 - 当前状态：前端已改造为移动端 H5 优先结构，并引入 `vue-router` 实现每次跳转对应独立页面；当前业务只保留“移动套餐办理”；移动套餐办理已具备“套餐选择 -> 确认办理 -> 转人工”的第一版流程；AI 客服已完成前端展示入口和聊天展示页；Maven 已确认可用；MySQL 本机连接已确认，`cmhk` 数据库已创建并写入基础数据；后端接口代码已通过测试；Docker、Redis 暂时先不处理
+- 当前补充：已根据渠道政策 HTML 和用户补充的学生优惠图片，重新设计移动套餐数据模型，新增套餐优惠权益表，并把学生 Slash 30GB/50GB 的折实月费、积分、渠道补贴、购机补贴等优惠写入数据库
 - 最近确认日期：2026-07-28
 
 ## 2. 已完成事项
@@ -250,6 +251,76 @@ npm.cmd run build
 
 结果：通过。
 
+2026-07-28 用户提供渠道政策 HTML：
+
+- 文件来源：用户本机微信下载目录中的 `channel-policy-JC-0001-202607 (19).html`
+- 已从套餐对比表提取移动套餐字段：
+  - 套餐名称
+  - 套餐类型
+  - 渠道展示价
+  - 官方月费
+  - 数据权益
+  - 本地通话
+  - 漫游权益
+  - 合约期
+  - 优惠截止日期
+- 当前仍只纳入移动套餐；HTML 中宽频套餐不纳入当前“移动套餐办理”业务。
+
+已调整数据库和后端实体：
+
+- `mobile_plan` 增加：
+  - `plan_type`
+  - `channel_price_text`
+  - `effective_monthly_fee`
+  - `effective_price_text`
+  - `official_monthly_fee`
+  - `official_price_text`
+  - `roaming_benefit`
+  - `promotion_end_date`
+  - `source_version`
+  - `discount_formula`
+- 新增 `mobile_plan_offer`：记录套餐附加优惠权益，例如积分、渠道补贴、购机补贴、免行政费、额外数据、社交娱乐数据组合等。
+- `mobile_plan_order` 增加套餐快照字段，确认办理时保存当时套餐价格和权益，避免后续套餐改价影响历史订单。
+
+已写入数据库：
+
+```text
+mobile_plan enabled=1：14 条
+mobile_plan_offer enabled=1：35 条
+```
+
+重点学生优惠：
+
+```text
+STUDENT_SLASH_30GB_24M  学生 Slash 30GB  HK$98/月   约HK$62/月
+STUDENT_SLASH_30GB_12M  学生 Slash 30GB  HK$118/月  约HK$71/月
+STUDENT_SLASH_50GB_24M  学生 Slash 50GB  HK$138/月  约HK$102/月
+STUDENT_SLASH_50GB_12M  学生 Slash 50GB  HK$158/月  约HK$105/月
+```
+
+已同步前端：
+
+- 套餐选择页优先展示折实月费；没有折实月费时展示渠道价
+- 套餐卡片展示套餐类型、合约期、数据、通话、漫游/额外权益、优惠截止
+- 套餐卡片展示前 4 条优惠权益
+- 确认页展示渠道价、折实月费、合约期、优惠截止和折算公式
+
+验证结果：
+
+```powershell
+cd D:\cmhkProject\frontend
+npm.cmd run build
+```
+
+结果：通过。
+
+```powershell
+cd D:\cmhkProject\backend
+D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
+```
+
+结果：通过。
+
 ```powershell
 cd D:\cmhkProject\backend
 mvn.cmd test
@@ -310,6 +381,54 @@ mvn.cmd test
 - `.codex/agents/discussion-agent.md`
 
 后续创建临时子代理时，应优先读取这些角色规范。代理实例仍然用完即关闭，项目中只保留角色说明文件。
+
+2026-07-28 用户要求在项目中新建一个保留的子代理用于测试。
+
+已新增：
+
+- `.codex/agents/test-agent.md`
+
+测试代理职责：
+
+- 前端构建验证
+- 后端测试验证
+- 必要时接口验证
+- 必要时移动端页面检查
+- 输出干净测试摘要，不负责 Git 提交，不输出真实配置，不执行破坏性数据库操作
+
+已同步写入 `.codex/PROJECT_RULES.md` 的多代理协作规定。
+
+2026-07-28 用户要求 Controller 层使用 SLF4J 添加日志。
+
+已完成：
+
+- `BusinessTypeController`：记录业务类型查询开始和查询数量
+- `HealthController`：记录健康检查开始、Redis 状态和 Redis 检查失败原因
+- `MobilePlanController`：记录套餐查询数量、优惠权益数量、订单创建的订单号、套餐编码和状态
+
+日志注意：
+
+- 不记录客户姓名
+- 不记录联系电话
+- 不记录数据库、Redis 等真实配置
+
+验证：
+
+```powershell
+cd D:\cmhkProject\backend
+D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
+```
+
+结果：通过。
+
+2026-07-28 用户补充长期要求：之后写 Controller 都要添加 SLF4J 日志。
+
+已写入 `.codex/PROJECT_RULES.md`：
+
+- 新增或修改 Controller 时必须添加关键日志
+- 记录接口进入、关键查询数量、关键业务结果
+- 不记录客户姓名、联系电话、身份证件、真实配置、Token 等敏感信息
+- 使用 SLF4J 占位符写法
 
 ### 2.5 项目协作规定
 

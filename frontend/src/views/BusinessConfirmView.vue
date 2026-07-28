@@ -13,10 +13,16 @@ const errorMessage = ref('')
 
 const planCode = computed(() => String(route.query.planCode || ''))
 const planName = computed(() => String(route.query.planName || '移动套餐'))
+const planType = computed(() => String(route.query.planType || '移动套餐'))
 const monthlyFee = computed(() => Number(route.query.monthlyFee || 0))
+const channelPriceText = computed(() => String(route.query.channelPriceText || `HK$${monthlyFee.value}/月`))
+const effectivePriceText = computed(() => String(route.query.effectivePriceText || ''))
 const dataQuota = computed(() => String(route.query.dataQuota || ''))
 const voiceQuota = computed(() => String(route.query.voiceQuota || ''))
+const roamingBenefit = computed(() => String(route.query.roamingBenefit || ''))
 const contractPeriod = computed(() => String(route.query.contractPeriod || ''))
+const promotionEndDate = computed(() => String(route.query.promotionEndDate || ''))
+const discountFormula = computed(() => String(route.query.discountFormula || ''))
 
 async function confirmApply() {
   if (!contactPhone.value.trim()) {
@@ -66,7 +72,7 @@ function goTransfer(orderNo: string) {
     <header class="page-header">
       <button class="back-button" type="button" @click="router.back()">‹</button>
       <div>
-        <p class="eyebrow">确认办理</p>
+        <p class="eyebrow">确认办理 · {{ planType }}</p>
         <h1>{{ planName }}</h1>
       </div>
     </header>
@@ -79,8 +85,12 @@ function goTransfer(orderNo: string) {
 
     <section class="summary-card">
       <div>
-        <span>月费</span>
-        <strong>${{ monthlyFee }}/月</strong>
+        <span>展示价</span>
+        <strong>{{ channelPriceText }}</strong>
+      </div>
+      <div>
+        <span>折实月费</span>
+        <strong>{{ effectivePriceText || channelPriceText }}</strong>
       </div>
       <div>
         <span>数据</span>
@@ -90,10 +100,23 @@ function goTransfer(orderNo: string) {
         <span>通话</span>
         <strong>{{ voiceQuota }}</strong>
       </div>
+      <div v-if="roamingBenefit">
+        <span>漫游/额外权益</span>
+        <strong>{{ roamingBenefit }}</strong>
+      </div>
       <div>
         <span>合约期</span>
         <strong>{{ contractPeriod }}</strong>
       </div>
+      <div v-if="promotionEndDate">
+        <span>优惠截止</span>
+        <strong>{{ promotionEndDate }}</strong>
+      </div>
+    </section>
+
+    <section v-if="discountFormula" class="notice-card">
+      <h2>折算参考</h2>
+      <p>{{ discountFormula }}</p>
     </section>
 
     <section class="form-card">
@@ -121,4 +144,3 @@ function goTransfer(orderNo: string) {
     </footer>
   </main>
 </template>
-
