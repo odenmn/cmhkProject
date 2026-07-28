@@ -1,0 +1,30 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: cmhk-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      TZ: ${TZ}
+    ports:
+      - "3306:3306"
+    volumes:
+      - cmhk_mysql_data:/var/lib/mysql
+      - ./backend/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7.2
+    container_name: cmhk-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - cmhk_redis_data:/data
+
+volumes:
+  cmhk_mysql_data:
+  cmhk_redis_data:
