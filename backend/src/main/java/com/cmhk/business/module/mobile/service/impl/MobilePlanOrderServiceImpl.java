@@ -16,6 +16,7 @@ import java.time.format.DateTimeFormatter;
 public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMapper, MobilePlanOrder> implements MobilePlanOrderService {
 
     private static final String STATUS_TRANSFER_TO_AGENT = "TRANSFER_TO_AGENT";
+    private static final int CUSTOMER_IDENTITY_OVERSEAS_STUDENT = 1;
 
     private final MobilePlanService mobilePlanService;
 
@@ -36,6 +37,7 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
 
         MobilePlanOrder order = new MobilePlanOrder();
         order.setOrderNo(generateOrderNo());
+        order.setPlanId(plan.getId());
         order.setPlanCode(plan.getPlanCode());
         order.setPlanName(plan.getPlanName());
         order.setPlanType(plan.getPlanType());
@@ -53,6 +55,14 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
         order.setDiscountFormula(plan.getDiscountFormula());
         order.setCustomerName(request.getCustomerName());
         order.setContactPhone(request.getContactPhone());
+        order.setCustomerIdentity(request.getCustomerIdentity());
+        order.setHasOffer(resolveHasOffer(request));
+        order.setHasPassOrHkid(request.getHasPassOrHkid());
+        order.setExpectedStartDate(request.getExpectedStartDate());
+        order.setIdType(request.getIdType());
+        order.setIdNo(request.getIdNo());
+        order.setReferrerPhone(request.getReferrerPhone());
+        order.setPreferredContactTime(request.getPreferredContactTime());
         order.setRemark(request.getRemark());
         order.setStatus(STATUS_TRANSFER_TO_AGENT);
         save(order);
@@ -63,5 +73,13 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
         String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
         int random = (int) (Math.random() * 9000) + 1000;
         return "MP" + time + random;
+    }
+
+    private Integer resolveHasOffer(MobilePlanOrderCreateRequest request) {
+        if (request.getCustomerIdentity() == null
+                || request.getCustomerIdentity() != CUSTOMER_IDENTITY_OVERSEAS_STUDENT) {
+            return 0;
+        }
+        return request.getHasOffer() == null ? 0 : request.getHasOffer();
     }
 }

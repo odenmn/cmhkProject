@@ -50,6 +50,17 @@ public class MobilePlanServiceImpl extends ServiceImpl<MobilePlanMapper, MobileP
         );
     }
 
+    @Override
+    public MobilePlan getEnabledPlanWithOffersByCode(String planCode) {
+        if (planCode == null || planCode.isBlank()) {
+            return null;
+        }
+        return listEnabledPlansWithOffers().stream()
+                .filter(plan -> planCode.equals(plan.getPlanCode()))
+                .findFirst()
+                .orElse(null);
+    }
+
     private List<MobilePlan> listEnabledPlansWithOffersFromDb() {
         List<MobilePlan> plans = lambdaQuery()
                 .eq(MobilePlan::getEnabled, 1)

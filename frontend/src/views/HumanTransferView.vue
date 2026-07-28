@@ -6,8 +6,6 @@ const route = useRoute()
 const router = useRouter()
 
 const orderNo = computed(() => String(route.query.orderNo || ''))
-const planName = computed(() => String(route.query.planName || '移动套餐'))
-const contactPhone = computed(() => String(route.query.contactPhone || ''))
 </script>
 
 <template>
@@ -38,12 +36,8 @@ const contactPhone = computed(() => String(route.query.contactPhone || ''))
         <strong>{{ orderNo }}</strong>
       </div>
       <div>
-        <span>办理套餐</span>
-        <strong>{{ planName }}</strong>
-      </div>
-      <div>
-        <span>联系电话</span>
-        <strong>{{ contactPhone || '未填写' }}</strong>
+        <span>订单信息</span>
+        <strong>已随订单保存</strong>
       </div>
       <div>
         <span>当前状态</span>
@@ -54,4 +48,3 @@ const contactPhone = computed(() => String(route.query.contactPhone || ''))
     <button class="primary-button full page-action" type="button" @click="router.push('/')">返回首页</button>
   </main>
 </template>
-

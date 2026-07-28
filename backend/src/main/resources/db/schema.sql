@@ -211,6 +211,7 @@ ON DUPLICATE KEY UPDATE
 CREATE TABLE IF NOT EXISTS mobile_plan_order (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_no VARCHAR(64) NOT NULL UNIQUE,
+    plan_id BIGINT,
     plan_code VARCHAR(64) NOT NULL,
     plan_name VARCHAR(128) NOT NULL,
     plan_type VARCHAR(64),
@@ -228,14 +229,24 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     discount_formula VARCHAR(512),
     customer_name VARCHAR(64),
     contact_phone VARCHAR(32) NOT NULL,
+    customer_identity TINYINT NOT NULL DEFAULT 0,
+    has_offer TINYINT NOT NULL DEFAULT 0,
+    has_pass_or_hkid TINYINT NOT NULL DEFAULT 0,
+    expected_start_date DATE,
+    id_type VARCHAR(32),
+    id_no VARCHAR(64),
+    referrer_phone VARCHAR(32),
+    preferred_contact_time VARCHAR(128),
     remark VARCHAR(512),
     status VARCHAR(32) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_mobile_plan_order_plan_id (plan_id),
     INDEX idx_mobile_plan_order_plan_code (plan_code),
     INDEX idx_mobile_plan_order_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CALL add_column_if_missing('mobile_plan_order', 'plan_id', 'BIGINT NULL', 'order_no');
 CALL add_column_if_missing('mobile_plan_order', 'plan_type', 'VARCHAR(64) NULL', 'plan_name');
 CALL add_column_if_missing('mobile_plan_order', 'channel_price_text', 'VARCHAR(64) NULL', 'monthly_fee');
 CALL add_column_if_missing('mobile_plan_order', 'effective_monthly_fee', 'DECIMAL(10, 2) NULL', 'channel_price_text');
@@ -248,5 +259,67 @@ CALL add_column_if_missing('mobile_plan_order', 'roaming_benefit', 'VARCHAR(128)
 CALL add_column_if_missing('mobile_plan_order', 'contract_period', 'VARCHAR(64) NULL', 'roaming_benefit');
 CALL add_column_if_missing('mobile_plan_order', 'promotion_end_date', 'DATE NULL', 'contract_period');
 CALL add_column_if_missing('mobile_plan_order', 'discount_formula', 'VARCHAR(512) NULL', 'promotion_end_date');
+CALL add_column_if_missing('mobile_plan_order', 'customer_identity', 'TINYINT NOT NULL DEFAULT 0', 'contact_phone');
+CALL add_column_if_missing('mobile_plan_order', 'has_offer', 'TINYINT NOT NULL DEFAULT 0', 'customer_identity');
+CALL add_column_if_missing('mobile_plan_order', 'has_pass_or_hkid', 'TINYINT NOT NULL DEFAULT 0', 'has_offer');
+CALL add_column_if_missing('mobile_plan_order', 'expected_start_date', 'DATE NULL', 'has_pass_or_hkid');
+CALL add_column_if_missing('mobile_plan_order', 'id_type', 'VARCHAR(32) NULL', 'expected_start_date');
+CALL add_column_if_missing('mobile_plan_order', 'id_no', 'VARCHAR(64) NULL', 'id_type');
+CALL add_column_if_missing('mobile_plan_order', 'referrer_phone', 'VARCHAR(32) NULL', 'id_no');
+CALL add_column_if_missing('mobile_plan_order', 'preferred_contact_time', 'VARCHAR(128) NULL', 'referrer_phone');
+
+DROP PROCEDURE IF EXISTS drop_column_if_exists;
+
+DELIMITER //
+CREATE PROCEDURE drop_column_if_exists(
+    IN target_table VARCHAR(64),
+    IN target_column VARCHAR(64)
+)
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = target_table
+          AND column_name = target_column
+    ) THEN
+        SET @ddl = CONCAT('ALTER TABLE ', target_table, ' DROP COLUMN ', target_column);
+        PREPARE stmt FROM @ddl;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END//
+DELIMITER ;
+
+CALL drop_column_if_exists('mobile_plan_order', 'has_offer_plus_or_hkid');
+CALL drop_column_if_exists('mobile_plan_order', 'has_offer_plus');
+
+DROP PROCEDURE IF EXISTS add_index_if_missing;
+
+DELIMITER //
+CREATE PROCEDURE add_index_if_missing(
+    IN target_table VARCHAR(64),
+    IN target_index VARCHAR(64),
+    IN index_definition VARCHAR(512)
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = target_table
+          AND index_name = target_index
+    ) THEN
+        SET @ddl = CONCAT('ALTER TABLE ', target_table, ' ADD INDEX ', target_index, ' ', index_definition);
+        PREPARE stmt FROM @ddl;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END//
+DELIMITER ;
+
+CALL add_index_if_missing('mobile_plan_order', 'idx_mobile_plan_order_plan_id', '(plan_id)');
 
 DROP PROCEDURE IF EXISTS add_column_if_missing;
+DROP PROCEDURE IF EXISTS drop_column_if_exists;
+DROP PROCEDURE IF EXISTS add_index_if_missing;

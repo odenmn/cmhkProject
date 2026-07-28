@@ -463,6 +463,125 @@ D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
 
 注意：本次已完成代码层面接入和单测编译验证，尚未启动 Redis 服务做真实接口缓存命中验证。
 
+2026-07-28 已开始完善移动套餐订单确认信息。
+
+设计结论：
+
+- `customer_identity` 表示客户身份，当前约定：
+  - `0`：自营客户
+  - `1`：留学生
+- 订单表同时保存套餐关联和套餐快照：
+  - `plan_id` / `plan_code` 用于关联套餐和后续统计
+  - 套餐名称、价格、权益、折算公式等快照用于历史展示和对账
+
+已调整数据库：
+
+- `mobile_plan_order.plan_id`
+- `mobile_plan_order.customer_identity`
+- `mobile_plan_order.id_type`
+- `mobile_plan_order.id_no`
+- `mobile_plan_order.referrer_phone`
+- `mobile_plan_order.preferred_contact_time`
+- 新增 `idx_mobile_plan_order_plan_id` 索引
+
+已调整后端：
+
+- `MobilePlanOrderCreateRequest` 增加客户身份、证件、推荐人、方便联系时间字段
+- `customer_identity` 增加 0 到 1 的基础校验
+- `MobilePlanOrder` 增加对应字段
+- `MobilePlanOrderServiceImpl` 创建订单时写入 `plan_id`、客户身份和办理信息
+
+已调整前端：
+
+- `BusinessConfirmView.vue` 增加客户身份、证件类型、证件号码、推荐人号码、方便联系时间
+- 学生套餐默认客户身份为留学生
+- 普通套餐默认客户身份为自营客户
+- `frontend/src/api/http.ts` 同步请求和订单类型字段
+
+2026-07-28 用户补充办理信息字段：
+
+- 目前是否有 offer？
+- 目前是否有通行证 / HKID？
+- 预计什么时候开始使用？
+
+已新增数据库字段：
+
+- `mobile_plan_order.has_offer`
+  - `0`：没有
+  - `1`：有
+- `mobile_plan_order.has_pass_or_hkid`
+  - `0`：没有
+  - `1`：有
+- `mobile_plan_order.expected_start_date`
+
+已同步：
+
+- `MobilePlanOrderCreateRequest`
+- `MobilePlanOrder`
+- `MobilePlanOrderServiceImpl`
+- `frontend/src/api/http.ts`
+- `BusinessConfirmView.vue`
+
+前端确认页现在新增：
+
+- “目前是否有 offer？”
+- “目前是否有通行证 / HKID？”
+- “预计什么时候开始使用？”
+
+显示规则：
+
+- 只有客户身份选择“留学生”时，显示 offer 选项
+- 通行证 / HKID 选项对所有客户身份显示
+
+已执行数据库脚本，确认 `mobile_plan_order` 已存在新增字段。
+
+2026-07-28 用户纠正字段口径：
+
+- 字段名称使用 `offer`，不是 `offer+`
+- 已从建表脚本和本机数据库删除错误字段：
+  - `mobile_plan_order.has_offer_plus_or_hkid`
+  - `mobile_plan_order.has_offer_plus`
+- 当前保留字段：
+  - `mobile_plan_order.has_offer`
+  - `mobile_plan_order.has_pass_or_hkid`
+  - `mobile_plan_order.expected_start_date`
+
+验证：
+
+```powershell
+cd D:\cmhkProject\backend
+D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
+```
+
+结果：通过。
+
+```powershell
+cd D:\cmhkProject\frontend
+npm.cmd run build
+```
+
+结果：通过。
+
+2026-07-28 已修正确认页 URL 传参方式：
+
+- 套餐选择页跳转确认页时，URL 只传 `planCode`
+- 确认页进入后调用 `GET /api/mobile-plans/{planCode}` 获取后端真实套餐详情
+- 确认页不再从 URL 读取套餐名称、价格、权益、合约期、折算公式等业务数据
+- 转人工页 URL 只保留 `orderNo`，不再携带联系电话
+- 前端提交订单时，预计开始日期为空则不传该字段，避免后端 `LocalDate` 解析空字符串失败
+
+新增后端接口：
+
+```text
+GET /api/mobile-plans/{planCode}
+```
+
+设计原因：
+
+- URL 只作为页面定位和最小标识，不承载套餐价格等可被用户篡改的业务数据
+- 套餐详情统一从后端读取，后端可继续复用 Redis 套餐缓存
+- 确认办理时后端仍按 `planCode` 查询真实套餐并生成订单快照
+
 ### 2.5 项目协作规定
 
 已创建：

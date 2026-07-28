@@ -18,6 +18,8 @@ public class MobilePlanOrder {
 
     private String orderNo;
 
+    private Long planId;
+
     private String planCode;
 
     private String planName;
@@ -51,6 +53,22 @@ public class MobilePlanOrder {
     private String customerName;
 
     private String contactPhone;
+
+    private Integer customerIdentity;
+
+    private Integer hasOffer;
+
+    private Integer hasPassOrHkid;
+
+    private LocalDate expectedStartDate;
+
+    private String idType;
+
+    private String idNo;
+
+    private String referrerPhone;
+
+    private String preferredContactTime;
 
     private String remark;
 

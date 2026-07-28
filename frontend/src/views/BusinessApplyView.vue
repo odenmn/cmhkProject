@@ -93,18 +93,7 @@ function selectPlan(plan: MobilePlan) {
       code: 'MOBILE_PLAN'
     },
     query: {
-      planCode: plan.planCode,
-      planName: plan.planName,
-      planType: plan.planType,
-      monthlyFee: String(plan.monthlyFee),
-      channelPriceText: plan.channelPriceText,
-      effectivePriceText: plan.effectivePriceText || '',
-      dataQuota: plan.dataQuota,
-      voiceQuota: plan.voiceQuota,
-      roamingBenefit: plan.roamingBenefit || '',
-      contractPeriod: plan.contractPeriod,
-      promotionEndDate: plan.promotionEndDate || '',
-      discountFormula: plan.discountFormula || ''
+      planCode: plan.planCode
     }
   })
 }

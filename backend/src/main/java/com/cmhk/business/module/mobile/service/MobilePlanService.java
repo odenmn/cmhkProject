@@ -8,4 +8,6 @@ import java.util.List;
 public interface MobilePlanService extends IService<MobilePlan> {
 
     List<MobilePlan> listEnabledPlansWithOffers();
+
+    MobilePlan getEnabledPlanWithOffersByCode(String planCode);
 }

@@ -16,7 +16,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -295,6 +296,7 @@ h2 {
 }
 
 .field-row input,
+.field-row select,
 .field-row textarea {
   width: 100%;
   min-height: 46px;
@@ -303,6 +305,10 @@ h2 {
   border: 1px solid #d8dee8;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.field-row select {
+  appearance: none;
 }
 
 .field-row textarea {

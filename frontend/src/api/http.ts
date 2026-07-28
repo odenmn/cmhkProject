@@ -55,12 +55,21 @@ export interface MobilePlanOrderCreateRequest {
   planCode: string
   customerName: string
   contactPhone: string
+  customerIdentity: number
+  hasOffer: number
+  hasPassOrHkid: number
+  expectedStartDate?: string
+  idType: string
+  idNo: string
+  referrerPhone: string
+  preferredContactTime: string
   remark: string
 }
 
 export interface MobilePlanOrder {
   id?: number
   orderNo: string
+  planId?: number
   planCode: string
   planName: string
   planType?: string
@@ -78,6 +87,14 @@ export interface MobilePlanOrder {
   discountFormula?: string
   customerName: string
   contactPhone: string
+  customerIdentity?: number
+  hasOffer?: number
+  hasPassOrHkid?: number
+  expectedStartDate?: string
+  idType?: string
+  idNo?: string
+  referrerPhone?: string
+  preferredContactTime?: string
   remark: string
   status: string
 }
@@ -94,6 +111,11 @@ export async function fetchBusinessTypes() {
 
 export async function fetchMobilePlans() {
   const response = await http.get<ApiResponse<MobilePlan[]>>('/mobile-plans')
+  return response.data
+}
+
+export async function fetchMobilePlan(planCode: string) {
+  const response = await http.get<ApiResponse<MobilePlan>>(`/mobile-plans/${encodeURIComponent(planCode)}`)
   return response.data
 }
 
