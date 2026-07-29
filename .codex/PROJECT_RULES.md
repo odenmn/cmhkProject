@@ -1,6 +1,6 @@
 # CMHK 项目开发规定
 
-本文档是本项目后续开发的长期协作规则。Codex 每次继续开发前，应优先阅读本文件，再读取 `.codex/PROJECT_STATUS.md`，最后阅读相关源码。
+本文档是本项目后续开发的长期协作规则。Codex 每次继续开发前，应优先阅读本文件，再读取 `.codex/PROJECT_STATUS.md`，需要追溯历史时读取 `.codex/PROJECT_HISTORY.md`，最后阅读相关源码。
 
 ## 1. 用户背景与对话策略
 
@@ -40,7 +40,8 @@ cmhkProject/
   docker-compose.yml       本地 MySQL 和 Redis
   README.md                面向运行使用的说明
   .codex/PROJECT_RULES.md  面向后续开发协作的规则
-  .codex/PROJECT_STATUS.md 面向项目推进阶段的记录
+  .codex/PROJECT_STATUS.md 当前状态快照
+  .codex/PROJECT_HISTORY.md 历史推进记录
   .codex/agents/           项目内固定代理角色规范
 ```
 
@@ -159,9 +160,15 @@ docker compose up -d
 
 ## 9. 项目进度记忆规定
 
-- 项目推进状态记录在 `.codex/PROJECT_STATUS.md`。
+- 项目进度记忆拆分为两个文件：
+  - `.codex/PROJECT_STATUS.md`：当前状态快照，只保留当前阶段、当前架构、已完成、进行中、阻塞问题、下一步和最近验证结果。
+  - `.codex/PROJECT_HISTORY.md`：历史推进记录，用于按日期保存详细修改内容、历史决策和历史测试结果。
 - 后续继续开发前，必须先读取 `.codex/PROJECT_RULES.md` 和 `.codex/PROJECT_STATUS.md`。
-- 每完成一个阶段或重要功能后，需要更新 `.codex/PROJECT_STATUS.md`。
+- 需要追溯历史过程、历史测试或旧决策时，再读取 `.codex/PROJECT_HISTORY.md`。
+- 不要在 `PROJECT_STATUS.md` 中持续追加所有历史过程；已经失效的状态应直接删除或替换。
+- 每完成一个阶段或重要功能后，需要判断并更新：
+  - `PROJECT_STATUS.md`：当前状态是否变化
+  - `PROJECT_HISTORY.md`：是否需要追加历史记录
 - 不要只依赖聊天上下文记忆项目进度，重要进度必须写回文件。
 - 当 Codex 判断已经新增或完成一个功能、一个阶段时，需要主动询问用户是否进行一次 Git 提交。
 - 除非用户明确要求立即提交，否则完成阶段后不要默认直接提交。
@@ -170,7 +177,7 @@ docker compose up -d
 
 - 用户要求拆分子任务时，主代理负责协调和最终决策，只接收子代理的干净摘要。
 - Git 提交代理负责检查提交范围、忽略规则、提交风险和建议提交信息；除非用户明确要求，不直接提交。
-- 进度读取与更新代理负责读取 `.codex/PROJECT_RULES.md` 和 `.codex/PROJECT_STATUS.md`，检查进度缺口并输出更新建议。
+- 进度读取与更新代理负责读取 `.codex/PROJECT_RULES.md` 和 `.codex/PROJECT_STATUS.md`，必要时读取 `.codex/PROJECT_HISTORY.md`，检查进度缺口并输出更新建议。
 - 任务讨论代理负责整理需求问题、优先级、接口/表设计和页面任务，不直接修改代码。
 - 测试代理负责独立执行或规划前端构建、后端测试、接口验证、移动端页面检查，并只输出干净测试摘要。
 - 子代理摘要回来后，主代理负责整合结论、执行必要修改，并保持主上下文简洁。

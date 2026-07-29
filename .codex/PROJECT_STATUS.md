@@ -1,559 +1,182 @@
-# CMHK 项目推进记录
+﻿# CMHK 项目当前状态快照
 
-本文档用于记录项目已经推进到哪个阶段。Codex 后续继续开发前，应先读取：
+本文档只记录当前有效状态，不持续追加历史过程。历史日期记录、详细修改内容和历史测试结果见 `.codex/PROJECT_HISTORY.md`。
+
+Codex 后续继续开发前，应先读取：
 
 1. `.codex/PROJECT_RULES.md`
 2. `.codex/PROJECT_STATUS.md`
+3. 需要追溯过程时再读取 `.codex/PROJECT_HISTORY.md`
 
 ## 1. 当前阶段
 
-- 阶段：项目基础结构搭建中
-- 当前状态：前端已改造为移动端 H5 优先结构，并引入 `vue-router` 实现每次跳转对应独立页面；当前业务只保留“移动套餐办理”；移动套餐办理已具备“套餐选择 -> 确认办理 -> 转人工”的第一版流程；AI 客服已完成前端展示入口和聊天展示页；Maven 已确认可用；MySQL 本机连接已确认，`cmhk` 数据库已创建并写入基础数据；后端接口代码已通过测试；Docker、Redis 暂时先不处理
-- 当前补充：已根据渠道政策 HTML 和用户补充的学生优惠图片，重新设计移动套餐数据模型，新增套餐优惠权益表，并把学生 Slash 30GB/50GB 的折实月费、积分、渠道补贴、购机补贴等优惠写入数据库
-- 最近确认日期：2026-07-28
+- 阶段：移动套餐办理主流程完善中
+- 当前业务范围：只保留“移动套餐办理”
+- 最近确认日期：2026-07-29
+- 当前核心流程：套餐选择 -> 确认办理 -> 转人工
+- 当前页面定位：移动端 H5 优先，每次跳转对应独立页面
+- AI 客服：已有前端展示入口和聊天展示页，暂未接真实 AI 能力
 
-## 2. 已完成事项
+## 2. 当前架构
 
-### 2.1 项目基础结构
+- 项目：CMHK 智能业务办理网站
+- 架构：前后端分离
+- 前端：Vue 3 + Vite + TypeScript + Axios + Vue Router
+- 后端：Spring Boot 3 + Java 21 + MyBatis Plus
+- 数据库：MySQL
+- 缓存：Redis
+- 本机真实配置：统一放在 `backend/src/main/resources/application-local.yml`，该文件不提交
 
-已创建根目录结构：
+当前目录重点：
 
 ```text
 D:\cmhkProject
-  backend/
-  frontend/
-  docker-compose.yml
-  README.md
-  .codex/
+  backend/                   Spring Boot 后端
+  frontend/                  Vue3 前端
+  docker-compose.yml         本地 MySQL 和 Redis 编排
+  README.md                  运行说明
+  .codex/PROJECT_RULES.md    项目协作规则
+  .codex/PROJECT_STATUS.md   当前状态快照
+  .codex/PROJECT_HISTORY.md  历史推进记录
+  .codex/agents/             固定子代理角色规范
 ```
 
-### 2.2 后端基础结构
-
-已创建 Spring Boot 后端骨架：
-
-- `backend/pom.xml`
-- `backend/src/main/java/com/cmhk/business/CmhkBusinessApplication.java`
-- `backend/src/main/resources/application.yml`
-- `backend/src/main/resources/db/schema.sql`
-
-已创建通用能力：
-
-- `ApiResponse<T>`：统一接口返回结构
-- `CorsConfig`：前端跨域配置
-- `/api/health`：健康检查接口
-
-已创建第一个业务模块：
-
-- 模块：业务类型 `business_type`
-- 接口：`GET /api/business-types`
-- 分层：
-  - `controller`
-  - `service`
-  - `service/impl`
-  - `mapper`
-  - `entity`
-
-### 2.3 前端基础结构
-
-已创建 Vue 3 + Vite + TypeScript 前端骨架：
-
-- `frontend/package.json`
-- `frontend/package-lock.json`
-- `frontend/index.html`
-- `frontend/vite.config.ts`
-- `frontend/tsconfig.json`
-- `frontend/src/main.ts`
-- `frontend/src/App.vue`
-- `frontend/src/api/http.ts`
-- `frontend/src/styles.css`
-
-已完成前端基础页面：
-
-- 左侧导航
-- 顶部标题区域
-- 业务类型卡片列表
-- 调用后端 `/api/business-types`
-- 后端不可用时显示提示信息
-
-用户已确认当前前端页面可以打开。此阶段先记录到这里，暂时不继续处理 Docker、Redis 和 MySQL。
-
-2026-07-27 用户明确：页面主要给移动端看。后续前端页面应按移动端 H5 优先设计，当前已有桌面式左侧导航布局需要在后续页面改造中调整为移动端结构。
-
-2026-07-27 已完成移动端 H5 和独立页面路由改造：
-
-- 新增 `vue-router`
-- `App.vue` 改为只承载 `RouterView`
-- 新增路由表：`frontend/src/router/index.ts`
-- 新增独立页面：
-  - `frontend/src/views/HomeView.vue`
-  - `frontend/src/views/BusinessApplyView.vue`
-  - `frontend/src/views/RecordsView.vue`
-  - `frontend/src/views/ProfileView.vue`
-- 首页从桌面左侧菜单布局改为移动端单列 H5 布局
-- 业务入口点击后跳转到独立办理页面 `/business/:code`
-- 办理记录页面路径：`/records`
-- 客户中心页面路径：`/profile`
-
-已执行验证：
-
-```powershell
-cd D:\cmhkProject\frontend
-npm.cmd install
-npm.cmd run build
-```
-
-构建结果：通过。
-
-注意：`npm install` 提示 4 个 high severity vulnerabilities，暂未执行 `npm audit fix --force`，避免强制升级带来破坏性变更。
-
-### 2.4 本地中间件配置
-
-已创建 `docker-compose.yml`：
-
-- MySQL 8.4
-- Redis 7.2
-- MySQL 初始化脚本挂载到 `schema.sql`
-
-本地中间件真实连接信息不提交，统一放在本机私有配置中：
-
-- 后端真实配置：`backend/src/main/resources/application-local.yml`
-- Docker Compose 真实配置：`.env`
-
-当前 `backend/src/main/resources/application.yml` 使用环境变量占位：
-
-```yaml
-spring:
-  datasource:
-    url: ${DB_URL:}
-    username: ${DB_USERNAME:}
-    password: ${DB_PASSWORD:}
-  data:
-    redis:
-      host: ${REDIS_HOST:}
-      port: ${REDIS_PORT:}
-      database: ${REDIS_DATABASE:}
-      password: ${REDIS_PASSWORD:}
-```
-
-`backend/src/main/resources/db/schema.sql` 已包含：
-
-- `CREATE DATABASE IF NOT EXISTS cmhk`
-- `USE cmhk`
-- `business_type` 表
-- 初始业务类型数据
-
-2026-07-27 已通过本机 MySQL 客户端执行 `schema.sql` 成功。
-
-注意：进度文档不记录真实数据库账号、密码或带密码命令。
-
-确认查询结果：
-
-```text
-Tables_in_cmhk
-business_type
-
-id  code         name          sort_order  enabled
-1   MOBILE_PLAN  移动套餐办理  10          1
-2   BROADBAND    宽带业务办理  20          1
-3   VALUE_ADDED  增值服务办理  30          1
-```
-
-2026-07-27 用户要求当前业务只保留“移动套餐办理”。已直接删除数据库中的：
-
-- `BROADBAND`
-- `VALUE_ADDED`
-
-确认查询结果：
-
-```text
-id  code         name          sort_order  enabled
-1   MOBILE_PLAN  移动套餐办理  10          1
-```
-
-同步修改：
-
-- `backend/src/main/resources/db/schema.sql` 后续重跑会删除 `BROADBAND` 和 `VALUE_ADDED`
-- `frontend/src/views/HomeView.vue` 删除首页说明文案，兜底数据只保留移动套餐办理
-- `BusinessTypeController` 只返回启用业务并按 `sortOrder` 排序
-
-已执行 `npm.cmd run build`，构建通过。
-
-2026-07-28 用户补充移动套餐办理需求：
-
-- 先给客户展示套餐选择
-- 客户选择套餐后进入确认办理
-- 确认办理后转人工
-- 页面旁边需要 AI 客服入口
-- 点击 AI 客服打开聊天界面
-- AI 客服当前只做前端展示，后续网站搭好后再接真实功能
-
-已完成第一版实现：
-
-前端新增/修改：
-
-- `frontend/src/views/BusinessApplyView.vue`：移动套餐选择页
-- `frontend/src/views/BusinessConfirmView.vue`：确认办理页
-- `frontend/src/views/HumanTransferView.vue`：转人工结果页
-- `frontend/src/views/AiChatView.vue`：AI 客服聊天展示页
-- `frontend/src/components/AiAssistantButton.vue`：右下角 AI 客服悬浮按钮
-- `frontend/src/router/index.ts`：新增确认页、转人工页、AI 聊天页路由
-- `frontend/src/api/http.ts`：新增移动套餐和订单接口封装
-- `frontend/src/styles.css`：新增套餐卡、流程步骤、转人工、聊天页样式
-
-当前移动端路由：
-
-```text
-/#/business/MOBILE_PLAN
-/#/business/MOBILE_PLAN/confirm
-/#/business/MOBILE_PLAN/transfer
-/#/ai-chat
-```
-
-后端新增/修改：
-
-- `GET /api/mobile-plans`：查询启用的移动套餐
-- `POST /api/mobile-plans/orders`：确认办理并生成转人工订单
-- 新增 `mobile` 模块：
-  - `controller`
-  - `dto`
-  - `entity`
-  - `mapper`
-  - `service`
-  - `service/impl`
-
-数据库新增：
-
-- `mobile_plan`：移动套餐表
-- `mobile_plan_order`：移动套餐办理订单表
-
-已通过本机 MySQL 执行 `schema.sql`，确认当前表：
-
-```text
-business_type
-mobile_plan
-mobile_plan_order
-```
-
-当前套餐数据：
-
-```text
-CMHK_5G_128  5G 畅享 128 套餐  128.00  30GB 本地数据
-CMHK_5G_198  5G 畅享 198 套餐  198.00  80GB 本地数据
-CMHK_5G_298  5G 尊享 298 套餐  298.00  150GB 本地数据
-```
-
-验证结果：
-
-```powershell
-cd D:\cmhkProject\frontend
-npm.cmd run build
-```
-
-结果：通过。
-
-2026-07-28 用户提供渠道政策 HTML：
-
-- 文件来源：用户本机微信下载目录中的 `channel-policy-JC-0001-202607 (19).html`
-- 已从套餐对比表提取移动套餐字段：
-  - 套餐名称
-  - 套餐类型
-  - 渠道展示价
-  - 官方月费
-  - 数据权益
-  - 本地通话
-  - 漫游权益
-  - 合约期
-  - 优惠截止日期
-- 当前仍只纳入移动套餐；HTML 中宽频套餐不纳入当前“移动套餐办理”业务。
-
-已调整数据库和后端实体：
-
-- `mobile_plan` 增加：
-  - `plan_type`
-  - `channel_price_text`
-  - `effective_monthly_fee`
-  - `effective_price_text`
-  - `official_monthly_fee`
-  - `official_price_text`
-  - `roaming_benefit`
-  - `promotion_end_date`
-  - `source_version`
-  - `discount_formula`
-- 新增 `mobile_plan_offer`：记录套餐附加优惠权益，例如积分、渠道补贴、购机补贴、免行政费、额外数据、社交娱乐数据组合等。
-- `mobile_plan_order` 增加套餐快照字段，确认办理时保存当时套餐价格和权益，避免后续套餐改价影响历史订单。
-
-已写入数据库：
-
-```text
-mobile_plan enabled=1：14 条
-mobile_plan_offer enabled=1：35 条
-```
-
-重点学生优惠：
-
-```text
-STUDENT_SLASH_30GB_24M  学生 Slash 30GB  HK$98/月   约HK$62/月
-STUDENT_SLASH_30GB_12M  学生 Slash 30GB  HK$118/月  约HK$71/月
-STUDENT_SLASH_50GB_24M  学生 Slash 50GB  HK$138/月  约HK$102/月
-STUDENT_SLASH_50GB_12M  学生 Slash 50GB  HK$158/月  约HK$105/月
-```
-
-已同步前端：
-
-- 套餐选择页优先展示折实月费；没有折实月费时展示渠道价
-- 套餐卡片展示套餐类型、合约期、数据、通话、漫游/额外权益、优惠截止
-- 套餐卡片展示前 4 条优惠权益
-- 确认页展示渠道价、折实月费、合约期、优惠截止和折算公式
-
-验证结果：
-
-```powershell
-cd D:\cmhkProject\frontend
-npm.cmd run build
-```
-
-结果：通过。
-
-```powershell
-cd D:\cmhkProject\backend
-D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
-```
-
-结果：通过。
-
-```powershell
-cd D:\cmhkProject\backend
-mvn.cmd test
-```
-
-结果：通过。
-
-2026-07-28 已完成后端配置脱敏：
-
-- `backend/src/main/resources/application.yml` 保留为可提交的公共配置
-- 公共配置使用 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`REDIS_HOST`、`REDIS_PORT`、`REDIS_DATABASE`、`REDIS_PASSWORD` 环境变量占位
-- 新增 `backend/src/main/resources/application-local.example.yml` 作为示例配置
-- 新增 `backend/src/main/resources/application-local.yml` 保存用户本机真实 MySQL 和 Redis 配置
-- `.gitignore` 已忽略 `application-local.yml`
-
-当前 `application-local.yml` 不应提交。
-
-2026-07-28 用户明确要求：之后所有真实配置都必须抽出来，统一放入 `backend/src/main/resources/application-local.yml` 管理，不允许写入可提交配置文件。
-
-2026-07-28 用户要求将当前任务拆分为多个独立子任务，由专门代理并行处理，主代理只接收干净摘要结果，保持上下文清晰。
-
-当前拆分为：
-
-- Git 提交代理：检查提交范围、忽略文件、提交风险和 commit message
-- 进度读取与更新代理：检查 `.codex/PROJECT_RULES.md` 和 `.codex/PROJECT_STATUS.md` 是否完整
-- 任务讨论代理：整理后续业务需求讨论、优先级、接口/表和页面任务
-
-代理摘要结论：
-
-- 暂不建议立刻提交，需先清理 `docker-compose.yml`、`README.md`、`PROJECT_STATUS.md` 中的真实配置痕迹
-- 进度文档中早期真实密码和带密码命令需要脱敏
-- 下一步业务讨论重点应放在套餐字段、订单字段、转人工状态、订单号和 AI 客服展示范围
-
-已根据摘要完成脱敏整理：
-
-- `docker-compose.yml` 改为读取 `.env`
-- 新增 `.env.example`
-- `README.md` 不再记录真实连接密码
-- `PROJECT_STATUS.md` 不再记录真实数据库密码或带密码命令
-- `application.yml` 不保留真实数据库或 Redis 默认值
-
-2026-07-28 用户要求 Git 提交必须规范，commit message 要简洁清楚，并且提交内容语言使用中文。
-
-已写入 `.codex/PROJECT_RULES.md`：
-
-- 使用 Conventional Commits 格式
-- commit message 使用中文简洁描述
-- 不使用 `更新`、`修复 bug` 等含糊描述
-- 提交前检查暂存区和敏感配置
-- 一次提交对应一个清晰阶段或明确功能
-
-2026-07-28 用户同意将固定子代理角色规范写入项目。
-
-已新增：
-
-- `.codex/agents/git-agent.md`
-- `.codex/agents/progress-agent.md`
-- `.codex/agents/discussion-agent.md`
-
-后续创建临时子代理时，应优先读取这些角色规范。代理实例仍然用完即关闭，项目中只保留角色说明文件。
-
-2026-07-28 用户要求在项目中新建一个保留的子代理用于测试。
-
-已新增：
-
-- `.codex/agents/test-agent.md`
-
-测试代理职责：
-
-- 前端构建验证
-- 后端测试验证
-- 必要时接口验证
-- 必要时移动端页面检查
-- 输出干净测试摘要，不负责 Git 提交，不输出真实配置，不执行破坏性数据库操作
-
-已同步写入 `.codex/PROJECT_RULES.md` 的多代理协作规定。
-
-2026-07-28 用户要求 Controller 层使用 SLF4J 添加日志。
-
-已完成：
-
-- `BusinessTypeController`：记录业务类型查询开始和查询数量
-- `HealthController`：记录健康检查开始、Redis 状态和 Redis 检查失败原因
-- `MobilePlanController`：记录套餐查询数量、优惠权益数量、订单创建的订单号、套餐编码和状态
-
-日志注意：
-
-- 不记录客户姓名
-- 不记录联系电话
-- 不记录数据库、Redis 等真实配置
-
-验证：
-
-```powershell
-cd D:\cmhkProject\backend
-D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
-```
-
-结果：通过。
-
-2026-07-28 用户补充长期要求：之后写 Controller 都要添加 SLF4J 日志。
-
-已写入 `.codex/PROJECT_RULES.md`：
-
-- 新增或修改 Controller 时必须添加关键日志
-- 记录接口进入、关键查询数量、关键业务结果
-- 不记录客户姓名、联系电话、身份证件、真实配置、Token 等敏感信息
-- 使用 SLF4J 占位符写法
-
-2026-07-28 用户要求套餐数据使用 Redis 缓存，减轻数据库压力，并实现缓存击穿、缓存穿透的通用复用能力。
-
-已新增：
-
-- `backend/src/main/java/com/cmhk/business/common/cache/CacheClient.java`
-
-通用缓存能力：
-
-- 先查 Redis，命中直接返回
-- Redis 未命中时回源数据库并写入 Redis
-- 使用空值缓存防止缓存穿透
-- 使用 Redis 互斥锁防止缓存击穿
-- 缓存 TTL 增加随机抖动，降低大量 key 同时过期风险
-- Redis 异常时记录 warn 日志并降级查询数据库，避免接口直接失败
-
-已接入：
-
-- `MobilePlanServiceImpl.listEnabledPlansWithOffers()`
-- Redis key：`cmhk:mobile-plan:list:enabled`
-- 套餐列表缓存时间：30 分钟
-- 空值缓存时间：2 分钟
-
-验证：
-
-```powershell
-cd D:\cmhkProject\backend
-D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
-```
-
-结果：通过。
-
-注意：本次已完成代码层面接入和单测编译验证，尚未启动 Redis 服务做真实接口缓存命中验证。
-
-2026-07-28 已开始完善移动套餐订单确认信息。
-
-设计结论：
-
-- `customer_identity` 表示客户身份，当前约定：
+## 3. 已完成
+
+### 3.1 基础工程
+
+- 已创建后端 Spring Boot 项目骨架
+- 已创建前端 Vue 3 + Vite 项目骨架
+- 已配置前后端分离调用方式
+- 已配置公共 `application.yml` 使用环境变量占位
+- 已创建 `application-local.example.yml`
+- 已忽略本机真实配置 `application-local.yml`、`.env` 等文件
+- 已创建 `.codex/PROJECT_RULES.md`
+- 已创建固定子代理规范：
+  - `.codex/agents/git-agent.md`
+  - `.codex/agents/progress-agent.md`
+  - `.codex/agents/discussion-agent.md`
+  - `.codex/agents/test-agent.md`
+
+### 3.2 后端能力
+
+- 通用返回：`ApiResponse<T>`
+- 跨域配置：`CorsConfig`
+- 健康检查接口：`GET /api/health`
+- 业务类型接口：`GET /api/business-types`
+- 移动套餐列表接口：`GET /api/mobile-plans`
+- 移动套餐详情接口：`GET /api/mobile-plans/{planCode}`
+- 移动套餐订单接口：`POST /api/mobile-plans/orders`
+- Controller 已按规则添加 SLF4J 日志，且不记录敏感信息
+- 移动套餐查询已接入 Redis 缓存通用类 `CacheClient`
+- `CacheClient` 已实现：
+  - 空值缓存，降低缓存穿透风险
+  - Redis 互斥锁，降低缓存击穿风险
+  - TTL 随机抖动，降低集中失效风险
+  - Redis 异常降级查数据库
+
+### 3.3 数据库
+
+- 当前数据库：`cmhk`
+- 当前业务类型只保留：
+  - `MOBILE_PLAN`：移动套餐办理
+- 当前核心业务表：
+  - `business_type`
+  - `mobile_plan`
+  - `mobile_plan_offer`
+  - `mobile_plan_order`
+- `mobile_plan` 已支持渠道政策套餐字段、折实月费、官方月费、合约期、优惠截止、折算公式等信息
+- `mobile_plan_offer` 已支持套餐附加优惠权益
+- `mobile_plan_order` 已保存套餐关联和套餐快照
+- `mobile_plan_order.customer_identity` 当前约定：
   - `0`：自营客户
   - `1`：留学生
-- 订单表同时保存套餐关联和套餐快照：
-  - `plan_id` / `plan_code` 用于关联套餐和后续统计
-  - 套餐名称、价格、权益、折算公式等快照用于历史展示和对账
+- `mobile_plan_order` 当前办理信息字段包括：
+  - `has_offer`
+  - `has_pass_or_hkid`
+  - `expected_start_date`
+  - `id_type`
+  - `id_no`
+  - `referrer_phone`
+  - `preferred_contact_time`
+- 已删除错误字段：
+  - `has_offer_plus_or_hkid`
+  - `has_offer_plus`
 
-已调整数据库：
+### 3.4 前端页面
 
-- `mobile_plan_order.plan_id`
-- `mobile_plan_order.customer_identity`
-- `mobile_plan_order.id_type`
-- `mobile_plan_order.id_no`
-- `mobile_plan_order.referrer_phone`
-- `mobile_plan_order.preferred_contact_time`
-- 新增 `idx_mobile_plan_order_plan_id` 索引
-
-已调整后端：
-
-- `MobilePlanOrderCreateRequest` 增加客户身份、证件、推荐人、方便联系时间字段
-- `customer_identity` 增加 0 到 1 的基础校验
-- `MobilePlanOrder` 增加对应字段
-- `MobilePlanOrderServiceImpl` 创建订单时写入 `plan_id`、客户身份和办理信息
-
-已调整前端：
-
-- `BusinessConfirmView.vue` 增加客户身份、证件类型、证件号码、推荐人号码、方便联系时间
-- 学生套餐默认客户身份为留学生
-- 普通套餐默认客户身份为自营客户
-- `frontend/src/api/http.ts` 同步请求和订单类型字段
-
-2026-07-28 用户补充办理信息字段：
-
-- 目前是否有 offer？
-- 目前是否有通行证 / HKID？
-- 预计什么时候开始使用？
-
-已新增数据库字段：
-
-- `mobile_plan_order.has_offer`
-  - `0`：没有
-  - `1`：有
-- `mobile_plan_order.has_pass_or_hkid`
-  - `0`：没有
-  - `1`：有
-- `mobile_plan_order.expected_start_date`
-
-已同步：
-
-- `MobilePlanOrderCreateRequest`
-- `MobilePlanOrder`
-- `MobilePlanOrderServiceImpl`
-- `frontend/src/api/http.ts`
-- `BusinessConfirmView.vue`
-
-前端确认页现在新增：
-
-- “目前是否有 offer？”
-- “目前是否有通行证 / HKID？”
-- “预计什么时候开始使用？”
-
-显示规则：
-
-- 只有客户身份选择“留学生”时，显示 offer 选项
+- 已改为移动端 H5 优先
+- 已引入 `vue-router`
+- 当前独立页面：
+  - `/#/`
+  - `/#/business/MOBILE_PLAN`
+  - `/#/business/MOBILE_PLAN/confirm?planCode=xxx`
+  - `/#/business/MOBILE_PLAN/transfer?orderNo=xxx`
+  - `/#/ai-chat`
+  - `/#/records`
+  - `/#/profile`
+- 套餐选择页展示套餐价格、权益、优惠、合约期
+- 确认页只从 URL 获取 `planCode`，套餐详情从后端接口加载
+- 确认页支持填写：
+  - 客户身份
+  - 客户姓名
+  - 联系电话
+  - 是否有 offer
+  - 是否有通行证 / HKID
+  - 预计开始使用日期
+  - 证件类型
+  - 证件号码
+  - 推荐人号码
+  - 方便联系时间
+  - 办理备注
+- offer 选项只在客户身份为“留学生”时显示
 - 通行证 / HKID 选项对所有客户身份显示
+- 转人工页 URL 只保留 `orderNo`，不携带联系电话
 
-已执行数据库脚本，确认 `mobile_plan_order` 已存在新增字段。
+### 3.5 协作规则
 
-2026-07-28 用户纠正字段口径：
+- Git commit 使用中文 Conventional Commits
+- Codex 完成一个功能或阶段后，需要主动询问用户是否提交
+- 除非用户明确要求立即提交，否则不要默认直接提交
+- 项目进度记录拆分为：
+  - `PROJECT_STATUS.md`：当前状态快照
+  - `PROJECT_HISTORY.md`：历史推进记录
 
-- 字段名称使用 `offer`，不是 `offer+`
-- 已从建表脚本和本机数据库删除错误字段：
-  - `mobile_plan_order.has_offer_plus_or_hkid`
-  - `mobile_plan_order.has_offer_plus`
-- 当前保留字段：
-  - `mobile_plan_order.has_offer`
-  - `mobile_plan_order.has_pass_or_hkid`
-  - `mobile_plan_order.expected_start_date`
+## 4. 进行中
 
-验证：
+- 继续完善移动套餐确认办理字段和交互
+- 后续需要启动 Spring Boot Web 服务，验证前端真实调用后端接口
+- Redis 代码已接入，但还需要在本机 Redis 服务运行状态下做真实缓存命中验证
+- AI 客服目前只是前端展示，后续再接真实能力
+
+## 5. 阻塞问题
+
+- Docker 尚未确认可用
+- Redis 服务尚未完成真实运行验证
+- Spring Boot 后端尚未作为 Web 服务完整联调验证
+- 当前前端开发服务可访问，但如果后端未启动，真实接口会不可用
+
+## 6. 下一步
+
+1. 启动 Spring Boot 后端服务
+2. 验证前端真实调用：
+   - `GET /api/mobile-plans`
+   - `GET /api/mobile-plans/{planCode}`
+   - `POST /api/mobile-plans/orders`
+3. 启动或确认 Redis，验证套餐缓存命中和降级行为
+4. 继续细化移动套餐办理字段校验、错误提示和人工转接数据
+5. 后续再接入真实 AI 客服能力
+
+## 7. 最近验证结果
+
+最近一次已通过：
 
 ```powershell
 cd D:\cmhkProject\backend
 D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
 ```
 
-结果：通过。
+结果：通过，`BUILD SUCCESS`。
 
 ```powershell
 cd D:\cmhkProject\frontend
@@ -562,154 +185,11 @@ npm.cmd run build
 
 结果：通过。
 
-2026-07-28 已修正确认页 URL 传参方式：
-
-- 套餐选择页跳转确认页时，URL 只传 `planCode`
-- 确认页进入后调用 `GET /api/mobile-plans/{planCode}` 获取后端真实套餐详情
-- 确认页不再从 URL 读取套餐名称、价格、权益、合约期、折算公式等业务数据
-- 转人工页 URL 只保留 `orderNo`，不再携带联系电话
-- 前端提交订单时，预计开始日期为空则不传该字段，避免后端 `LocalDate` 解析空字符串失败
-
-新增后端接口：
+最近提交：
 
 ```text
-GET /api/mobile-plans/{planCode}
+1f59a04 docs: 新增阶段完成后提交确认规则
+34983c3 feat: 完善移动套餐确认办理流程
+565e492 feat: 新增移动套餐 Redis 缓存
+472d043 feat: 新增移动套餐优惠模型和展示
 ```
-
-设计原因：
-
-- URL 只作为页面定位和最小标识，不承载套餐价格等可被用户篡改的业务数据
-- 套餐详情统一从后端读取，后端可继续复用 Redis 套餐缓存
-- 确认办理时后端仍按 `planCode` 查询真实套餐并生成订单快照
-
-2026-07-28 用户新增协作规则：
-
-- 当 Codex 判断已经新增或完成一个功能、一个阶段时，需要主动询问用户是否进行一次 Git 提交
-- 除非用户明确要求立即提交，否则完成阶段后不要默认直接提交
-- 该规则已写入 `.codex/PROJECT_RULES.md`
-
-### 2.5 项目协作规定
-
-已创建：
-
-- `.codex/PROJECT_RULES.md`
-
-该文件记录用户背景、对话策略、项目结构和开发约定。
-
-## 3. 环境状态
-
-### 3.1 用户本机已确认
-
-用户 PowerShell 已确认：
-
-```powershell
-node -v
-```
-
-输出过：
-
-```text
-v24.18.0
-```
-
-用户已在前端目录执行成功：
-
-```powershell
-npm.cmd install
-npm.cmd run dev
-```
-
-Vite 已成功启动，曾输出：
-
-```text
-Local: http://localhost:5175/
-```
-
-说明：`5173` 和 `5174` 当时被占用，Vite 自动切换到 `5175`。
-
-用户已确认 Maven 可用。直接执行 Maven 完整路径曾成功：
-
-```powershell
-D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd -version
-```
-
-输出过：
-
-```text
-Apache Maven 3.9.16
-Java version: 21.0.12
-```
-
-用户之后反馈环境变量已配置完成，Maven 已 OK。
-
-### 3.2 用户遇到过的问题
-
-PowerShell 执行：
-
-```powershell
-npm -v
-```
-
-曾报错：
-
-```text
-无法加载文件 D:\nodejs\npm.ps1，因为在此系统上禁止运行脚本
-```
-
-处理策略：
-
-- 优先让用户使用 `npm.cmd`
-- 不强制修改 PowerShell 执行策略
-
-推荐命令：
-
-```powershell
-cd D:\cmhkProject\frontend
-npm.cmd run dev
-```
-
-### 3.3 Codex 当前进程限制
-
-Codex 当前工具进程可能暂时读不到用户新安装后的 PATH，曾检测不到：
-
-- `node`
-- `npm.cmd`
-- `mvn`
-- `docker`
-- `git`
-
-但这不一定代表用户本机未安装。后续判断环境时，要结合用户自己 PowerShell 的输出。
-
-## 4. 已知未完成事项
-
-- Docker 尚未确认可用
-- Git 尚未确认可用
-- Spring Boot 后端测试已通过，但尚未作为 Web 服务启动验证
-- MySQL 建库脚本已在用户本机执行成功
-- Redis 尚未完成本机启动验证
-- 前端页面已启动，但后端未启动时会显示“后端服务暂不可用”
-- 当前没有登录、用户、订单、业务办理流程等真实业务功能
-- 用户已明确表示暂时不管 Docker 和 Redis 能否运行
-
-## 5. 下一步建议
-
-建议下一阶段按以下顺序推进：
-
-1. 保持前端页面可访问
-2. 继续细化移动套餐办理字段和页面交互
-3. 启动 Spring Boot Web 服务，验证前端真实调用 `/api/mobile-plans`
-4. 后续再接入真实 AI 客服能力
-
-## 6. 后续更新规则
-
-每完成一个阶段或重要功能后，应更新本文档：
-
-- 当前阶段
-- 已完成事项
-- 新增接口
-- 新增页面
-- 环境变化
-- 已知问题
-- 下一步建议
-
-不要只在聊天里说明进度，重要进度必须写回本文件。
