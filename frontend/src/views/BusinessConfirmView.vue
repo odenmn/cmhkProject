@@ -90,8 +90,8 @@ async function confirmApply() {
       return
     }
     errorMessage.value = response.message
-  } catch (error) {
-    goTransfer(`LOCAL${Date.now()}`)
+  } catch {
+    errorMessage.value = '办理请求提交失败，请确认后端服务已启动并重新登录后再试。'
   } finally {
     submitting.value = false
   }
