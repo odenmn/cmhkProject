@@ -28,3 +28,8 @@ mybatis-plus:
 logging:
   level:
     com.cmhk.business: debug
+
+cmhk:
+  auth:
+    token-secret: ${AUTH_TOKEN_SECRET:}
+    access-token-ttl-hours: ${AUTH_TOKEN_TTL_HOURS:24}

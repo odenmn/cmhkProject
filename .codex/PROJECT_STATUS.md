@@ -10,10 +10,10 @@ Codex 后续继续开发前，应先读取：
 
 ## 1. 当前阶段
 
-- 阶段：移动套餐办理主流程完善中
+- 阶段：渠道入口、手机号注册与令牌鉴权已完成并完成真实接口联调
 - 当前业务范围：只保留“移动套餐办理”
-- 最近确认日期：2026-07-29
-- 当前核心流程：套餐选择 -> 确认办理 -> 转人工
+- 最近确认日期：2026-08-03
+- 当前核心流程：菜单页 -> 进入业务模块时令牌校验 -> 渠道入口识别 -> 手机号验证/注册 -> 客户首次渠道绑定 -> 套餐选择 -> 确认办理 -> 转人工
 - 当前页面定位：移动端 H5 优先，每次跳转对应独立页面
 - AI 客服：已有前端展示入口和聊天展示页，暂未接真实 AI 能力
 
@@ -74,6 +74,13 @@ D:\cmhkProject
   - Redis 互斥锁，降低缓存击穿风险
   - TTL 随机抖动，降低集中失效风险
   - Redis 异常降级查数据库
+- 已新增渠道认证接口：
+  - `GET /api/channel-auth/entry?entryToken=xxx`
+  - `POST /api/channel-auth/verification-codes`
+  - `POST /api/channel-auth/phone-login`
+- 当前验证码为开发阶段模拟验证码：`123456`，有效期 5 分钟，单验证码最多尝试 5 次，发送间隔 60 秒
+- 手机号登录成功后，后端签发带签名的访问令牌，默认有效期 24 小时
+- 除健康检查、业务菜单和渠道认证接口外，`/api/**` 均由后端令牌拦截器保护
 
 ### 3.3 数据库
 
@@ -85,6 +92,12 @@ D:\cmhkProject
   - `mobile_plan`
   - `mobile_plan_offer`
   - `mobile_plan_order`
+- 已在 `schema.sql` 新增渠道入口与客户注册表，并已同步到实际 MySQL：
+  - `channel`
+  - `channel_entry`
+  - `customer`
+  - `customer_channel_binding`
+  - `phone_verification_code`
 - `mobile_plan` 已支持渠道政策套餐字段、折实月费、官方月费、合约期、优惠截止、折算公式等信息
 - `mobile_plan_offer` 已支持套餐附加优惠权益
 - `mobile_plan_order` 已保存套餐关联和套餐快照
@@ -132,6 +145,10 @@ D:\cmhkProject
 - offer 选项只在客户身份为“留学生”时显示
 - 通行证 / HKID 选项对所有客户身份显示
 - 转人工页 URL 只保留 `orderNo`，不携带联系电话
+- 新增渠道手机号验证独立页：`/#/channel-auth?entryToken=xxx`
+- 扫码入口可使用：`/#/?entry_token=DEMO-ENTRY-001`
+- 长者演示入口：`/#/?entry_token=ELDERLY-ENTRY-001`，会启用大字体和更大操作区
+- 菜单页可直接访问；套餐办理、办理记录、客户中心和 AI 客服页面必须先完成手机号登录，登录成功后统一回到首页菜单
 
 ### 3.5 协作规则
 
@@ -144,6 +161,7 @@ D:\cmhkProject
 
 ## 4. 进行中
 
+- 将当前登录客户与后续套餐需求、订单提交关联
 - 继续完善移动套餐确认办理字段和交互
 - 后续需要启动 Spring Boot Web 服务，验证前端真实调用后端接口
 - Redis 代码已接入，但还需要在本机 Redis 服务运行状态下做真实缓存命中验证
@@ -158,14 +176,10 @@ D:\cmhkProject
 
 ## 6. 下一步
 
-1. 启动 Spring Boot 后端服务
-2. 验证前端真实调用：
-   - `GET /api/mobile-plans`
-   - `GET /api/mobile-plans/{planCode}`
-   - `POST /api/mobile-plans/orders`
-3. 启动或确认 Redis，验证套餐缓存命中和降级行为
-4. 继续细化移动套餐办理字段校验、错误提示和人工转接数据
-5. 后续再接入真实 AI 客服能力
+1. 将当前登录客户与后续套餐需求、订单提交关联
+2. 获取领功 API 文档后，设计线索表和异步推送记录
+3. 开发老年关怀模式的一键微信人工客服入口
+4. 启动或确认 Redis，验证套餐缓存命中和降级行为
 
 ## 7. 最近验证结果
 
@@ -184,6 +198,34 @@ npm.cmd run build
 ```
 
 结果：通过。
+
+```powershell
+cd D:\cmhkProject\frontend
+npm.cmd run build
+```
+
+结果：通过，已包含渠道手机号验证页面。
+
+```powershell
+cd D:\cmhkProject\backend
+D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
+```
+
+结果：通过，`BUILD SUCCESS`，已包含渠道认证模块。
+
+令牌鉴权真实接口联调已通过：
+
+- 未携带令牌访问 `GET /api/mobile-plans` 返回 `401`
+- 手机号登录成功后返回访问令牌
+- 携带 `Authorization: Bearer Token` 访问套餐接口返回 `200`
+
+真实接口联调已通过：
+
+- 自营入口 `DEMO-ENTRY-001` 可正确识别为普通渠道
+- 长者入口 `ELDERLY-ENTRY-001` 可正确识别为关怀模式
+- 模拟验证码发送和手机号登录成功
+- 客户首次渠道绑定成功
+- 联调产生的测试客户、绑定和验证码记录已清理
 
 最近提交：
 

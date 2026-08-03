@@ -646,3 +646,94 @@ npm.cmd run build
 - 修改 `.codex/PROJECT_RULES.md`，明确 STATUS 和 HISTORY 的职责
 - 每次任务完成后同时判断是否需要更新 STATUS 和 HISTORY
 - 同步更新 `.codex/agents/progress-agent.md`，避免进度代理继续把历史细节追加到 STATUS
+
+## 2026-08-03
+
+### 渠道入口与手机号注册基础
+
+根据新的业务流程，先实现“渠道识别 -> 手机号验证 -> 客户创建或复用 -> 首次渠道绑定”。本阶段不接真实短信服务、不接领功 API，也不改动已有移动套餐订单逻辑。
+
+新增数据库模型：
+
+- `channel`：渠道配置，支持 `elderly_mode`、微信客服链接和二维码配置
+- `channel_entry`：二维码或链接入口，使用 `entry_token` 映射内部渠道
+- `customer`：手机号唯一的客户主体
+- `customer_channel_binding`：只保存客户首次成功进入的渠道和入口
+- `phone_verification_code`：验证码哈希、有效期、尝试次数和使用状态
+
+新增后端接口：
+
+- `GET /api/channel-auth/entry?entryToken=xxx`：校验渠道入口
+- `POST /api/channel-auth/verification-codes`：发送开发阶段模拟验证码
+- `POST /api/channel-auth/phone-login`：验证手机号并创建或复用客户
+
+实现规则：
+
+- 开发阶段模拟验证码固定为 `123456`
+- 验证码有效期 5 分钟，同一验证码最多尝试 5 次
+- 同一手机号发送验证码间隔 60 秒
+- 同一手机号只创建一个客户记录
+- 客户首次渠道绑定后，后续从其他渠道进入不会覆盖归属
+- Controller 使用 SLF4J 日志，不记录手机号或验证码
+
+前端新增：
+
+- `frontend/src/views/ChannelAuthView.vue`：独立手机号验证页
+- 首页检测 `entry_token` 后自动跳转注册页
+- 演示入口：`DEMO-ENTRY-001`
+- 长者关怀演示入口：`ELDERLY-ENTRY-001`，启用大字体和更大操作区
+
+验证：
+
+```powershell
+cd D:\cmhkProject\backend
+D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
+
+cd D:\cmhkProject\frontend
+npm.cmd run build
+```
+
+结果：后端 Maven 测试通过，前端 Vite 生产构建通过。
+
+当时待处理：当前环境未发现可用的 `mysql` 或 Docker 命令行，`schema.sql` 的新增表尚未直接同步到实际 MySQL；该问题已在下方“实际 MySQL 同步与接口联调”记录中解决。
+
+### 实际 MySQL 同步与接口联调
+
+后续确认可通过 JDBC 使用本机私有配置连接 MySQL，因此按用户要求直接执行了本次新增表结构和演示数据：
+
+- 创建 `channel`、`channel_entry`、`customer`、`customer_channel_binding`、`phone_verification_code`
+- 写入 `DEMO-ENTRY-001` 自营渠道演示入口
+- 写入 `ELDERLY-ENTRY-001` 长者关怀演示入口
+- 查询确认两个入口及其长者模式配置均正确存在
+
+使用临时 `8081` 后端进程完成真实接口联调：
+
+- 渠道入口校验成功
+- 模拟验证码发送成功
+- 手机号登录成功
+- 客户首次渠道绑定成功
+
+联调生成的测试客户、渠道绑定和验证码记录已直接从 MySQL 清理。临时 `8081` 后端进程已关闭，未影响原有 `8080` 服务。
+
+### 手机号登录令牌鉴权
+
+实现“菜单页公开、进入业务模块必须登录”的令牌鉴权机制：
+
+- 手机号验证码登录成功后，后端使用本机私有密钥签发带签名、带有效期的访问令牌
+- 令牌默认有效期为 24 小时，令牌密钥仅保存在被忽略的 `application-local.yml`
+- 新增 Spring MVC 令牌拦截器，保护套餐查询、订单创建等业务接口
+- 保持健康检查、业务菜单和渠道认证接口可公开访问
+- 前端将登录会话保存在 `sessionStorage`，Axios 自动添加 `Authorization: Bearer Token`
+- 前端路由守卫保护套餐办理、转人工、办理记录、客户中心和 AI 客服页；初始实现为登录后返回原目标页，后续已调整为统一回到首页菜单
+
+验证：
+
+- `mvn.cmd test` 通过，`BUILD SUCCESS`
+- `npm.cmd run build` 通过
+- 临时 `8081` 后端接口联调通过：无令牌访问套餐接口返回 `401`；登录后取得令牌；携带令牌访问返回 `200`
+- 联调产生的测试客户、绑定和验证码记录已从 MySQL 清理，临时 `8081` 服务已关闭
+
+### 调整登录成功跳转
+
+- 手机号验证成功后统一跳转首页菜单
+- 移除路由守卫和接口未授权处理中的原目标页面回跳参数

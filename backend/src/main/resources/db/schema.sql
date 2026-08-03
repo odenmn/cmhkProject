@@ -296,6 +296,86 @@ CALL drop_column_if_exists('mobile_plan_order', 'has_offer_plus');
 
 DROP PROCEDURE IF EXISTS add_index_if_missing;
 
+CREATE TABLE IF NOT EXISTS channel (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    channel_code VARCHAR(64) NOT NULL UNIQUE,
+    channel_name VARCHAR(128) NOT NULL,
+    elderly_mode TINYINT NOT NULL DEFAULT 0,
+    wechat_service_url VARCHAR(512),
+    wechat_qr_code_url VARCHAR(512),
+    enabled TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS channel_entry (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    channel_id BIGINT NOT NULL,
+    entry_token VARCHAR(128) NOT NULL UNIQUE,
+    entry_name VARCHAR(128) NOT NULL,
+    expires_at DATETIME,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_channel_entry_channel_id (channel_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    phone VARCHAR(32) NOT NULL UNIQUE,
+    phone_verified_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_channel_binding (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    customer_id BIGINT NOT NULL UNIQUE,
+    channel_id BIGINT NOT NULL,
+    entry_id BIGINT NOT NULL,
+    bound_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_customer_channel_binding_channel_id (channel_id),
+    INDEX idx_customer_channel_binding_entry_id (entry_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS phone_verification_code (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    phone VARCHAR(32) NOT NULL,
+    code_hash CHAR(64) NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME,
+    status VARCHAR(16) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_phone_verification_code_phone_created (phone, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO channel (channel_code, channel_name, elderly_mode, enabled)
+VALUES
+    ('CMHK_DIRECT', 'CMHK 自营渠道', 0, 1),
+    ('CMHK_ELDERLY', 'CMHK 长者关怀渠道', 1, 1)
+ON DUPLICATE KEY UPDATE
+    channel_name = VALUES(channel_name),
+    elderly_mode = VALUES(elderly_mode),
+    enabled = VALUES(enabled);
+
+INSERT INTO channel_entry (channel_id, entry_token, entry_name, enabled)
+SELECT id, 'DEMO-ENTRY-001', '自营渠道演示入口', 1
+FROM channel
+WHERE channel_code = 'CMHK_DIRECT'
+ON DUPLICATE KEY UPDATE
+    entry_name = VALUES(entry_name),
+    enabled = VALUES(enabled);
+
+INSERT INTO channel_entry (channel_id, entry_token, entry_name, enabled)
+SELECT id, 'ELDERLY-ENTRY-001', '长者关怀演示入口', 1
+FROM channel
+WHERE channel_code = 'CMHK_ELDERLY'
+ON DUPLICATE KEY UPDATE
+    entry_name = VALUES(entry_name),
+    enabled = VALUES(enabled);
+
 DELIMITER //
 CREATE PROCEDURE add_index_if_missing(
     IN target_table VARCHAR(64),

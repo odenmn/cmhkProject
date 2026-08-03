@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { type BusinessType, fetchBusinessTypes } from '../api/http'
 
 const router = useRouter()
+const route = useRoute()
 const businessTypes = ref<BusinessType[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
@@ -22,6 +23,12 @@ const fallbackBusinessTypes: BusinessType[] = [
 ]
 
 onMounted(async () => {
+  const entryToken = String(route.query.entry_token || '')
+  if (entryToken) {
+    await router.replace({ name: 'channel-auth', query: { entryToken } })
+    return
+  }
+
   try {
     const response = await fetchBusinessTypes()
     if (response.code === 0) {

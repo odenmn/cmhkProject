@@ -217,6 +217,12 @@ h2 {
   border-color: #ffd5dd;
 }
 
+.status-box.success {
+  color: #11653a;
+  background: #f0fbf4;
+  border-color: #bce7ca;
+}
+
 .bottom-tabs {
   position: fixed;
   left: 50%;
@@ -356,6 +362,26 @@ h2 {
 }
 
 .primary-button.full {
+  width: 100%;
+}
+
+.secondary-button {
+  min-height: 46px;
+  margin-top: 14px;
+  padding: 0 18px;
+  color: #b00020;
+  border: 1px solid #b00020;
+  border-radius: 8px;
+  background: #ffffff;
+  font-weight: 700;
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.secondary-button.full {
   width: 100%;
 }
 
@@ -590,6 +616,50 @@ h2 {
 
 .page-action {
   margin-top: 14px;
+}
+
+.channel-notice span {
+  color: #7a8797;
+  font-size: 12px;
+}
+
+.channel-notice h2 {
+  margin: 6px 0 0;
+}
+
+.auth-page {
+  padding-bottom: 116px;
+}
+
+.auth-hint {
+  margin: 12px 0 0;
+  color: #687789;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.elderly-mode {
+  font-size: 18px;
+}
+
+.elderly-mode h1 {
+  font-size: 30px;
+}
+
+.elderly-mode h2 {
+  font-size: 21px;
+}
+
+.elderly-mode .field-row span,
+.elderly-mode .auth-hint {
+  font-size: 16px;
+}
+
+.elderly-mode .field-row input,
+.elderly-mode .primary-button,
+.elderly-mode .secondary-button {
+  min-height: 54px;
+  font-size: 18px;
 }
 
 .ai-float-button {
