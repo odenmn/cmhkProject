@@ -68,7 +68,7 @@ const fallbackPlans: MobilePlan[] = [
 onMounted(async () => {
   try {
     const response = await fetchMobilePlans()
-    if (response.code === 0) {
+    if (response.code === 1) {
       plans.value = response.data
       return
     }

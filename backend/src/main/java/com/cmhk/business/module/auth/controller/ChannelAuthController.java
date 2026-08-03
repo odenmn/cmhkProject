@@ -30,40 +30,25 @@ public class ChannelAuthController {
     @GetMapping("/entry")
     public ApiResponse<ChannelEntryContextResponse> resolveEntry(@RequestParam String entryToken) {
         log.info("开始校验渠道入口");
-        try {
-            ChannelEntryContextResponse response = channelAuthService.resolveEntry(entryToken);
-            log.info("渠道入口校验完成，elderlyMode={}", response.elderlyMode());
-            return ApiResponse.success(response);
-        } catch (IllegalArgumentException exception) {
-            log.info("渠道入口校验失败，原因={}", exception.getMessage());
-            return ApiResponse.fail(exception.getMessage());
-        }
+        ChannelEntryContextResponse response = channelAuthService.resolveEntry(entryToken);
+        log.info("渠道入口校验完成，elderlyMode={}", response.elderlyMode());
+        return ApiResponse.success(response);
     }
 
     @PostMapping("/verification-codes")
     public ApiResponse<Void> sendVerificationCode(@Valid @RequestBody VerificationCodeSendRequest request) {
         log.info("开始发送模拟验证码");
-        try {
-            channelAuthService.sendMockVerificationCode(request);
-            log.info("模拟验证码发送完成");
-            return ApiResponse.success(null);
-        } catch (IllegalArgumentException exception) {
-            log.info("模拟验证码发送失败，原因={}", exception.getMessage());
-            return ApiResponse.fail(exception.getMessage());
-        }
+        channelAuthService.sendMockVerificationCode(request);
+        log.info("模拟验证码发送完成");
+        return ApiResponse.success(null);
     }
 
     @PostMapping("/phone-login")
     public ApiResponse<PhoneLoginResponse> loginByPhone(@Valid @RequestBody PhoneLoginRequest request) {
         log.info("开始手机号验证码登录");
-        try {
-            PhoneLoginResponse response = channelAuthService.loginByPhone(request);
-            log.info("手机号验证码登录完成，customerId={}，newCustomer={}，elderlyMode={}",
-                    response.customerId(), response.newCustomer(), response.elderlyMode());
-            return ApiResponse.success(response);
-        } catch (IllegalArgumentException exception) {
-            log.info("手机号验证码登录失败，原因={}", exception.getMessage());
-            return ApiResponse.fail(exception.getMessage());
-        }
+        PhoneLoginResponse response = channelAuthService.loginByPhone(request);
+        log.info("手机号验证码登录完成，customerId={}，newCustomer={}，elderlyMode={}",
+                response.customerId(), response.newCustomer(), response.elderlyMode());
+        return ApiResponse.success(response);
     }
 }

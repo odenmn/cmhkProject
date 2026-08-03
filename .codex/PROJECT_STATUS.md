@@ -60,7 +60,8 @@ D:\cmhkProject
 
 ### 3.2 后端能力
 
-- 通用返回：`ApiResponse<T>`
+- 通用返回：`ApiResponse<T>`，`code = 1` 表示成功，`code = 0` 表示业务失败
+- 全局异常处理：`GlobalExceptionHandler`，统一处理参数校验、业务参数、请求体格式和未知异常
 - 跨域配置：`CorsConfig`
 - 健康检查接口：`GET /api/health`
 - 业务类型接口：`GET /api/business-types`

@@ -31,7 +31,7 @@ onMounted(async () => {
 
   try {
     const response = await fetchBusinessTypes()
-    if (response.code === 0) {
+    if (response.code === 1) {
       businessTypes.value = response.data.filter((item) => item.enabled === 1)
       return
     }

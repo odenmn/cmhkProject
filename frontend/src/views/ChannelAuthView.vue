@@ -31,7 +31,7 @@ onMounted(async () => {
 
   try {
     const response = await resolveChannelEntry(entryToken.value)
-    if (response.code !== 0 || !response.data) {
+    if (response.code !== 1 || !response.data) {
       errorMessage.value = response.message || '渠道入口不可用。'
       return
     }
@@ -54,7 +54,7 @@ async function sendCode() {
   successMessage.value = ''
   try {
     const response = await sendMockVerificationCode(entryToken.value, phone.value)
-    if (response.code !== 0) {
+    if (response.code !== 1) {
       errorMessage.value = response.message
       return
     }
@@ -77,7 +77,7 @@ async function submitLogin() {
   errorMessage.value = ''
   try {
     const response = await loginByPhone(entryToken.value, phone.value, verificationCode.value)
-    if (response.code !== 0 || !response.data) {
+    if (response.code !== 1 || !response.data) {
       errorMessage.value = response.message || '验证失败，请重试。'
       return
     }

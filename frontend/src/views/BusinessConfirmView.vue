@@ -42,7 +42,7 @@ onMounted(async () => {
 
   try {
     const response = await fetchMobilePlan(planCode.value)
-    if (response.code !== 0 || !response.data) {
+    if (response.code !== 1 || !response.data) {
       errorMessage.value = response.message || '套餐不存在或已下架，请返回重新选择套餐。'
       return
     }
@@ -85,7 +85,7 @@ async function confirmApply() {
       preferredContactTime: preferredContactTime.value,
       remark: remark.value
     })
-    if (response.code === 0) {
+    if (response.code === 1) {
       goTransfer(response.data.orderNo)
       return
     }
