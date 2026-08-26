@@ -10,10 +10,12 @@ Codex 后续继续开发前，应先读取：
 
 ## 1. 当前阶段
 
-- 阶段：渠道入口、手机号注册与令牌鉴权已完成并完成真实接口联调
+- 阶段：JOINCOM × CMHK 管理后台 MVP 已完成首版代码实现及本机 MySQL 增量迁移，等待真实数据联调
+- 管理端范围：ICCID、客户、订单、甲方对账、二级渠道结算和操作日志
+- 管理端目录：`admin-frontend/`，桌面端 Vue 3 + Vite + TypeScript + Element Plus
 - 当前业务范围：只保留“移动套餐办理”
 - 最近确认日期：2026-08-03
-- 当前核心流程：菜单页 -> 进入业务模块时令牌校验 -> 渠道入口识别 -> 手机号验证/注册 -> 客户首次渠道绑定 -> 套餐选择 -> 确认办理 -> 转人工
+- 当前核心流程：菜单页 -> 进入业务模块时令牌校验 -> 渠道入口识别 -> 手机号验证/注册 -> 客户首次渠道绑定 -> 套餐选择 -> 确认办理 -> 创建归属当前客户的订单 -> 转人工
 - 当前页面定位：移动端 H5 优先，每次跳转对应独立页面
 - AI 客服：已有前端展示入口和聊天展示页，暂未接真实 AI 能力
 
@@ -68,6 +70,7 @@ D:\cmhkProject
 - 移动套餐列表接口：`GET /api/mobile-plans`
 - 移动套餐详情接口：`GET /api/mobile-plans/{planCode}`
 - 移动套餐订单接口：`POST /api/mobile-plans/orders`
+- 创建移动套餐订单时，从 Token 获取当前客户 ID 并写入订单 `customer_id`
 - Controller 已按规则添加 SLF4J 日志，且不记录敏感信息
 - 移动套餐查询已接入 Redis 缓存通用类 `CacheClient`
 - `CacheClient` 已实现：
@@ -97,11 +100,18 @@ D:\cmhkProject
   - `channel`
   - `channel_entry`
   - `customer`
+- 已同步管理后台增量结构到本机 `cmhk`：
+  - `iccid_inventory`、`iccid_assignment_history`
+  - `cmhk_reconciliation_import`、`cmhk_reconciliation_row`
+  - `secondary_channel`、`secondary_commission_rule`、`secondary_commission_record`
+  - `operation_log`
+  - `customer` 与 `mobile_plan_order` 的管理后台扩展字段
   - `customer_channel_binding`
   - `phone_verification_code`
 - `mobile_plan` 已支持渠道政策套餐字段、折实月费、官方月费、合约期、优惠截止、折算公式等信息
 - `mobile_plan_offer` 已支持套餐附加优惠权益
 - `mobile_plan_order` 已保存套餐关联和套餐快照
+- `mobile_plan_order.customer_id` 已关联登录客户，并建立查询索引
 - `mobile_plan_order.customer_identity` 当前约定：
   - `0`：自营客户
   - `1`：留学生
@@ -151,7 +161,16 @@ D:\cmhkProject
 - 长者演示入口：`/#/?entry_token=ELDERLY-ENTRY-001`，会启用大字体和更大操作区
 - 菜单页可直接访问；套餐办理、办理记录、客户中心和 AI 客服页面必须先完成手机号登录，登录成功后统一回到首页菜单
 
-### 3.5 协作规则
+### 3.5 管理后台 MVP
+
+- 独立管理员登录与 `/api/admin/**` 鉴权
+- ICCID 卡池新增、XLS/XLSX/CSV 导入、查询、分配、解绑、使用、停用和配对历史
+- 客户和订单列表、新增、编辑与聚合详情
+- CMHK 对账文件 SHA-256 防重、预览、确认、自动匹配和人工异常匹配
+- 二级渠道档案、数据库结算规则、BigDecimal 佣金公式、规则快照、T+N 拆分、人工修正和确认结算
+- 首页指标、操作日志及桌面管理端全部对应页面
+
+### 3.6 协作规则
 
 - Git commit 使用中文 Conventional Commits
 - Codex 完成一个功能或阶段后，需要主动询问用户是否提交
@@ -162,27 +181,36 @@ D:\cmhkProject
 
 ## 4. 进行中
 
-- 将当前登录客户与后续套餐需求、订单提交关联
+- 启动后端和管理端，完成 ICCID、客户、订单与对账的真实接口联调
+- 使用真实 CMHK 对账文件核对列名别名和状态映射
+- 配置独立管理员密码与 Token 密钥
+- 开发当前登录客户的办理记录查询接口与页面
 - 继续完善移动套餐确认办理字段和交互
-- 后续需要启动 Spring Boot Web 服务，验证前端真实调用后端接口
 - Redis 代码已接入，但还需要在本机 Redis 服务运行状态下做真实缓存命中验证
 - AI 客服目前只是前端展示，后续再接真实能力
 
 ## 5. 阻塞问题
 
+- 管理后台 SQL 尚未在实际 MySQL 执行
+- 管理员账号尚需在 `application-local.yml` 配置
 - Docker 尚未确认可用
 - Redis 服务尚未完成真实运行验证
-- Spring Boot 后端尚未作为 Web 服务完整联调验证
-- 当前前端开发服务可访问，但如果后端未启动，真实接口会不可用
+- Redis 服务尚未完成真实运行验证
 
 ## 6. 下一步
 
-1. 将当前登录客户与后续套餐需求、订单提交关联
-2. 获取领功 API 文档后，设计线索表和异步推送记录
-3. 开发老年关怀模式的一键微信人工客服入口
-4. 启动或确认 Redis，验证套餐缓存命中和降级行为
+1. 启动后端和 `admin-frontend`，联调 ICCID 分配
+2. 使用真实甲方文件验证预览、确认和异常匹配
+3. 使用已激活、已对账订单验证二级渠道佣金和人工结算
 
 ## 7. 最近验证结果
+
+2026-08-19 管理后台验证：
+
+- 后端 `mvn.cmd test` 通过，共 4 项测试
+- 管理端 `npm.cmd run build` 通过
+- 原移动端 `npx.cmd vue-tsc --noEmit` 通过
+- 管理端登录页及主框架已完成 1280、1440、1920 宽度 Chrome 渲染检查
 
 最近一次已通过：
 
@@ -228,10 +256,20 @@ D:\download\apache-maven-3.9.16-bin\apache-maven-3.9.16\bin\mvn.cmd test
 - 客户首次渠道绑定成功
 - 联调产生的测试客户、绑定和验证码记录已清理
 
+订单客户关联真实接口联调已通过：
+
+- 手机号登录成功后取得客户 ID 与 Token
+- 创建移动套餐订单成功
+- 新订单 `customer_id` 与当前登录客户 ID 一致
+- 联调产生的订单、客户、绑定和验证码记录已清理
+
 最近提交：
 
 ```text
 1f59a04 docs: 新增阶段完成后提交确认规则
+c5c6c56 fix: 修复确认办理伪成功跳转
+4de6f0a feat: 新增全局异常处理
+a0f6a8e feat: 新增渠道登录令牌鉴权
 34983c3 feat: 完善移动套餐确认办理流程
 565e492 feat: 新增移动套餐 Redis 缓存
 472d043 feat: 新增移动套餐优惠模型和展示
