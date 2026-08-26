@@ -8,7 +8,10 @@ import com.cmhk.business.module.admin.mapper.IccidInventoryMapper;
 import com.cmhk.business.module.admin.mapper.ReconciliationRowMapper;
 import com.cmhk.business.module.admin.mapper.SecondaryCommissionRecordMapper;
 import com.cmhk.business.module.customer.entity.Customer;
+import com.cmhk.business.module.customer.entity.CustomerStatusCode;
 import com.cmhk.business.module.customer.mapper.CustomerMapper;
+import com.cmhk.business.module.channel.entity.Channel;
+import com.cmhk.business.module.channel.mapper.ChannelMapper;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
 import org.springframework.stereotype.Service;
@@ -27,23 +30,33 @@ public class AdminCustomerService {
     private final ReconciliationRowMapper reconciliationRowMapper;
     private final SecondaryCommissionRecordMapper commissionRecordMapper;
     private final OperationLogService logService;
+    private final ChannelMapper channelMapper;
 
     public AdminCustomerService(CustomerMapper customerMapper, MobilePlanOrderMapper orderMapper,
                                 IccidInventoryMapper iccidMapper, ReconciliationRowMapper reconciliationRowMapper,
-                                SecondaryCommissionRecordMapper commissionRecordMapper, OperationLogService logService) {
+                                SecondaryCommissionRecordMapper commissionRecordMapper, OperationLogService logService,
+                                ChannelMapper channelMapper) {
         this.customerMapper = customerMapper;
         this.orderMapper = orderMapper;
         this.iccidMapper = iccidMapper;
         this.reconciliationRowMapper = reconciliationRowMapper;
         this.commissionRecordMapper = commissionRecordMapper;
         this.logService = logService;
+        this.channelMapper = channelMapper;
     }
 
-    public List<Customer> list(String keyword, String type, String status) {
+    /** 返回客户归属使用的主渠道选项，供管理端将渠道 ID 映射为名称。 */
+    public List<Channel> channels() {
+        return channelMapper.selectList(new LambdaQueryWrapper<Channel>()
+                .eq(Channel::getEnabled, 1)
+                .orderByAsc(Channel::getChannelName));
+    }
+
+    public List<Customer> list(String keyword, String type, Integer status) {
         return customerMapper.selectList(new LambdaQueryWrapper<Customer>()
                 .and(keyword != null && !keyword.isBlank(), q -> q.like(Customer::getName, keyword).or().like(Customer::getPhone, keyword))
                 .eq(type != null && !type.isBlank(), Customer::getCustomerType, type)
-                .eq(status != null && !status.isBlank(), Customer::getCurrentStatus, status)
+                .eq(status != null, Customer::getCurrentStatus, status)
                 .orderByDesc(Customer::getId));
     }
 
@@ -60,6 +73,7 @@ public class AdminCustomerService {
                 new LambdaQueryWrapper<SecondaryCommissionRecord>().in(SecondaryCommissionRecord::getOrderId, orderIds));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("customer", customer);
+        result.put("channel", customer.getChannelId() == null ? null : channelMapper.selectById(customer.getChannelId()));
         result.put("orders", orders);
         result.put("iccids", iccids);
         result.put("reconciliationRows", rows);
@@ -75,10 +89,11 @@ public class AdminCustomerService {
         target.setPhone(requiredText(input.getPhone(), "手机号不能为空"));
         target.setContactMethod(input.getContactMethod());
         target.setCustomerType(input.getCustomerType() == null ? "DIRECT" : input.getCustomerType());
+        target.setCustomerCategory(input.getCustomerCategory());
         target.setChannelId(input.getChannelId());
         target.setIntendedPlan(input.getIntendedPlan());
         target.setRequirementSummary(input.getRequirementSummary());
-        target.setCurrentStatus(input.getCurrentStatus() == null ? "待处理" : input.getCurrentStatus());
+        target.setCurrentStatus(input.getCurrentStatus() == null ? CustomerStatusCode.PENDING : input.getCurrentStatus());
         if (id == null) {
             target.setPhoneVerifiedAt(LocalDateTime.now());
             customerMapper.insert(target);
@@ -97,8 +112,10 @@ public class AdminCustomerService {
         Customer copy = new Customer();
         copy.setId(source.getId()); copy.setPhone(source.getPhone()); copy.setPhoneVerifiedAt(source.getPhoneVerifiedAt());
         copy.setName(source.getName()); copy.setContactMethod(source.getContactMethod()); copy.setCustomerType(source.getCustomerType());
+        copy.setCustomerCategory(source.getCustomerCategory());
         copy.setChannelId(source.getChannelId()); copy.setIntendedPlan(source.getIntendedPlan());
         copy.setRequirementSummary(source.getRequirementSummary()); copy.setCurrentStatus(source.getCurrentStatus());
+        copy.setSourceSystem(source.getSourceSystem()); copy.setSourceCustomerId(source.getSourceCustomerId());
         copy.setCreatedAt(source.getCreatedAt()); copy.setUpdatedAt(source.getUpdatedAt());
         return copy;
     }

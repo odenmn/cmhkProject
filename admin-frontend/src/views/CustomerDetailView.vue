@@ -1,3 +1,44 @@
-<script setup lang="ts">import{onMounted,ref}from'vue';import{useRoute,useRouter}from'vue-router';import{api}from'../api/admin';import{ElMessage}from'element-plus';const route=useRoute(),router=useRouter(),data=ref<any>();onMounted(async()=>{try{data.value=await api.customer(Number(route.params.id))}catch(e:any){ElMessage.error(e.message)}});</script>
-<template><div v-if="data" class="page"><div class="page-heading"><div><h1>{{data.customer.name||'未命名客户'}}</h1><p>客户完整业务链：渠道、订单、ICCID、UMALL、对账和二级渠道结算。</p></div><el-button @click="router.back()">返回列表</el-button></div><div class="detail-grid"><div v-for="item in [['手机号',data.customer.phone],['客户类型',data.customer.customerType==='CHANNEL'?'渠道客户':'自营客户'],['渠道ID',data.customer.channelId],['意向套餐',data.customer.intendedPlan],['当前状态',data.customer.currentStatus],['联系方式',data.customer.contactMethod],['创建时间',data.customer.createdAt],['更新时间',data.customer.updatedAt]]" :key="item[0]" class="detail-item"><div class="detail-label">{{item[0]}}</div><div class="detail-value">{{item[1]||'—'}}</div></div></div><div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">办理订单</span><span class="table-meta">{{data.orders.length}} 条</span></div><el-table :data="data.orders"><el-table-column prop="orderNo" label="内部订单号" min-width="180"/><el-table-column prop="umallOrderNo" label="UMALL订单号" min-width="160"/><el-table-column prop="planName" label="套餐" min-width="170"/><el-table-column prop="status" label="办理状态" width="110"/><el-table-column prop="activationStatus" label="激活状态" width="110"/><el-table-column prop="contractStatus" label="合约状态" width="110"/><el-table-column prop="reconciliationStatus" label="对账状态" width="110"/></el-table></div><div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">ICCID 配对</span></div><el-table :data="data.iccids"><el-table-column prop="iccid" label="ICCID"/><el-table-column prop="status" label="状态"/><el-table-column prop="currentOrderId" label="订单ID"/><el-table-column prop="assignedAt" label="分配时间"/></el-table></div><div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">对账与渠道结算</span></div><el-table :data="data.reconciliationRows"><el-table-column prop="umallOrderNo" label="UMALL订单号"/><el-table-column prop="matchMethod" label="匹配方式"/><el-table-column prop="matchStatus" label="匹配状态"/><el-table-column prop="activationStatus" label="激活状态"/><el-table-column prop="contractStatus" label="合约状态"/></el-table><el-table :data="data.commissionRecords" style="border-top:1px solid #eee"><el-table-column prop="channelId" label="二级渠道ID"/><el-table-column prop="channelPayable" label="渠道应结"/><el-table-column prop="finalAmount" label="最终金额"/><el-table-column prop="status" label="结算状态"/></el-table></div></div></template>
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { api } from '../api/admin'
 
+const route = useRoute()
+const router = useRouter()
+const data = ref<any>()
+const statusLabels: Record<number, string> = { 0: '待处理', 1: '跟进中', 2: '待资料', 3: '办理中', 4: '待激活', 5: '已激活', 6: '已完成', 9: '无效' }
+
+onMounted(async () => {
+  try {
+    data.value = await api.customer(Number(route.params.id))
+  } catch (error: any) {
+    ElMessage.error(error.message)
+  }
+})
+</script>
+
+<template>
+  <div v-if="data" class="page">
+    <div class="page-heading"><div><h1>{{ data.customer.name || '未命名客户' }}</h1><p>客户完整业务链：渠道、订单、ICCID、UMALL、对账和二级渠道结算。</p></div><el-button @click="router.back()">返回列表</el-button></div>
+    <div class="detail-grid">
+      <div v-for="item in [
+        ['手机号', data.customer.phone],
+        ['归属类型', data.customer.customerType === 'CHANNEL' ? '渠道客户' : '自营客户'],
+        ['客户类别', data.customer.customerCategory],
+        ['渠道', data.channel?.channelName || (data.customer.channelId ? `渠道 ${data.customer.channelId}` : null)],
+        ['意向套餐', data.customer.intendedPlan],
+        ['当前状态', statusLabels[Number(data.customer.currentStatus)] || `未知(${data.customer.currentStatus})`],
+        ['需求摘要', data.customer.requirementSummary],
+        ['联系方式', data.customer.contactMethod],
+        ['创建时间', data.customer.createdAt],
+        ['更新时间', data.customer.updatedAt]
+      ]" :key="item[0]" class="detail-item">
+        <div class="detail-label">{{ item[0] }}</div><div class="detail-value">{{ item[1] || '—' }}</div>
+      </div>
+    </div>
+    <div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">办理订单</span><span class="table-meta">{{ data.orders.length }} 条</span></div><el-table :data="data.orders"><el-table-column prop="orderNo" label="内部订单号" min-width="180" /><el-table-column prop="umallOrderNo" label="UMALL订单号" min-width="160" /><el-table-column prop="planName" label="套餐" min-width="170" /><el-table-column prop="status" label="办理状态" width="110" /><el-table-column prop="activationStatus" label="激活状态" width="110" /><el-table-column prop="contractStatus" label="合约状态" width="110" /><el-table-column prop="reconciliationStatus" label="对账状态" width="110" /></el-table></div>
+    <div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">ICCID 配对</span></div><el-table :data="data.iccids"><el-table-column prop="iccid" label="ICCID" /><el-table-column prop="status" label="状态" /><el-table-column prop="currentOrderId" label="订单ID" /><el-table-column prop="assignedAt" label="分配时间" /></el-table></div>
+    <div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">对账与渠道结算</span></div><el-table :data="data.reconciliationRows"><el-table-column prop="umallOrderNo" label="UMALL订单号" /><el-table-column prop="matchMethod" label="匹配方式" /><el-table-column prop="matchStatus" label="匹配状态" /><el-table-column prop="activationStatus" label="激活状态" /><el-table-column prop="contractStatus" label="合约状态" /></el-table><el-table :data="data.commissionRecords" style="border-top: 1px solid #eee"><el-table-column prop="channelId" label="二级渠道ID" /><el-table-column prop="channelPayable" label="渠道应结" /><el-table-column prop="finalAmount" label="最终金额" /><el-table-column prop="status" label="结算状态" /></el-table></div>
+  </div>
+</template>
