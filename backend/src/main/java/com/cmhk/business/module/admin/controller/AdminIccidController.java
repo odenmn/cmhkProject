@@ -4,7 +4,7 @@ import com.cmhk.business.common.ApiResponse;
 import com.cmhk.business.config.AdminAuthInterceptor;
 import com.cmhk.business.module.admin.entity.IccidAssignmentHistory;
 import com.cmhk.business.module.admin.entity.IccidInventory;
-import com.cmhk.business.module.admin.service.IccidService;
+import com.cmhk.business.module.admin.service.AdminIccidService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,10 +27,10 @@ public class AdminIccidController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminIccidController.class);
 
-    private final IccidService service;
+    private final AdminIccidService service;
 
     /** 单构造器由 Spring 自动注入，无需字段注入或额外的 @Autowired。 */
-    public AdminIccidController(IccidService service) {
+    public AdminIccidController(AdminIccidService service) {
         this.service = service;
     }
 

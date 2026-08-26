@@ -14,7 +14,7 @@ public class AdminOrderController {
        return ApiResponse.success(rows);}
  @GetMapping("/{id}")
  public ApiResponse<MobilePlanOrder> detail(@PathVariable Long id){
-       return ApiResponse.success(service.required(id));}
+       return ApiResponse.success(service.detail(id));}
  @PostMapping
  public ApiResponse<MobilePlanOrder> create(@RequestBody MobilePlanOrder input,@RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator){
        return ApiResponse.success(

@@ -1,6 +1,7 @@
 package com.cmhk.business.module.admin.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cmhk.business.common.cache.CacheClient;
 import com.cmhk.business.module.admin.entity.IccidInventory;
 import com.cmhk.business.module.admin.entity.ReconciliationRow;
 import com.cmhk.business.module.admin.entity.SecondaryCommissionRecord;
@@ -14,10 +15,13 @@ import com.cmhk.business.module.channel.entity.Channel;
 import com.cmhk.business.module.channel.mapper.ChannelMapper;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +29,9 @@ import java.util.Map;
 
 @Service
 public class AdminCustomerService {
+    private static final Duration CACHE_TTL = Duration.ofMinutes(5);
+    private static final Duration EMPTY_CACHE_TTL = Duration.ofMinutes(1);
+
     private final CustomerMapper customerMapper;
     private final MobilePlanOrderMapper orderMapper;
     private final IccidInventoryMapper iccidMapper;
@@ -32,11 +39,15 @@ public class AdminCustomerService {
     private final SecondaryCommissionRecordMapper commissionRecordMapper;
     private final OperationLogService logService;
     private final ChannelMapper channelMapper;
+    private final CacheClient cacheClient;
+    private final JavaType customerListType;
+    private final JavaType channelListType;
+    private final JavaType detailType;
 
     public AdminCustomerService(CustomerMapper customerMapper, MobilePlanOrderMapper orderMapper,
                                 IccidInventoryMapper iccidMapper, ReconciliationRowMapper reconciliationRowMapper,
                                 SecondaryCommissionRecordMapper commissionRecordMapper, OperationLogService logService,
-                                ChannelMapper channelMapper) {
+                                ChannelMapper channelMapper, CacheClient cacheClient, ObjectMapper objectMapper) {
         this.customerMapper = customerMapper;
         this.orderMapper = orderMapper;
         this.iccidMapper = iccidMapper;
@@ -44,16 +55,48 @@ public class AdminCustomerService {
         this.commissionRecordMapper = commissionRecordMapper;
         this.logService = logService;
         this.channelMapper = channelMapper;
+        this.cacheClient = cacheClient;
+        this.customerListType = objectMapper.getTypeFactory()
+                .constructCollectionType(List.class, Customer.class);
+        this.channelListType = objectMapper.getTypeFactory()
+                .constructCollectionType(List.class, Channel.class);
+        this.detailType = objectMapper.getTypeFactory()
+                .constructMapType(LinkedHashMap.class, String.class, Object.class);
     }
 
     /** 返回客户归属使用的主渠道选项，供管理端将渠道 ID 映射为名称。 */
     public List<Channel> channels() {
+        String key = cacheClient.versionedKey(AdminCacheKeys.CUSTOMER_CHANNELS, "enabled");
+        return cacheClient.queryWithMutex(
+                key,
+                channelListType,
+                this::channelsFromDatabase,
+                Duration.ofMinutes(15),
+                EMPTY_CACHE_TTL
+        );
+    }
+
+    private List<Channel> channelsFromDatabase() {
         return channelMapper.selectList(new LambdaQueryWrapper<Channel>()
                 .eq(Channel::getEnabled, 1)
                 .orderByAsc(Channel::getChannelName));
     }
 
     public List<Customer> list(String keyword, String type, Integer status) {
+        String key = cacheClient.versionedKey(
+                AdminCacheKeys.CUSTOMERS,
+                "list:" + AdminCacheKeys.discriminator(keyword, type, status)
+        );
+        return cacheClient.queryWithMutex(
+                key,
+                customerListType,
+                () -> listFromDatabase(keyword, type, status),
+                CACHE_TTL,
+                EMPTY_CACHE_TTL
+        );
+    }
+
+    private List<Customer> listFromDatabase(String keyword, String type, Integer status) {
         List<Customer> customers = customerMapper.selectList(new LambdaQueryWrapper<Customer>()
                 .and(keyword != null && !keyword.isBlank(), q -> q.like(Customer::getName, keyword).or().like(Customer::getPhone, keyword))
                 .eq(type != null && !type.isBlank(), Customer::getCustomerType, type)
@@ -87,6 +130,17 @@ public class AdminCustomerService {
     }
 
     public Map<String, Object> detail(Long id) {
+        String key = cacheClient.versionedKey(AdminCacheKeys.CUSTOMERS, "detail:" + id);
+        return cacheClient.queryWithMutex(
+                key,
+                detailType,
+                () -> detailFromDatabase(id),
+                CACHE_TTL,
+                EMPTY_CACHE_TTL
+        );
+    }
+
+    private Map<String, Object> detailFromDatabase(Long id) {
         Customer customer = required(id);
         List<MobilePlanOrder> orders = orderMapper.selectList(new LambdaQueryWrapper<MobilePlanOrder>()
                 .eq(MobilePlanOrder::getCustomerId, id).orderByDesc(MobilePlanOrder::getId));
@@ -125,6 +179,11 @@ public class AdminCustomerService {
             customerMapper.insert(target);
         } else customerMapper.updateById(target);
         logService.record(operator, id == null ? "CUSTOMER_CREATE" : "CUSTOMER_UPDATE", "CUSTOMER", target.getId(), before, target, null);
+        cacheClient.invalidateNamespacesAfterCommit(
+                AdminCacheKeys.CUSTOMERS,
+                AdminCacheKeys.ICCIDS,
+                AdminCacheKeys.DASHBOARD
+        );
         return target;
     }
 

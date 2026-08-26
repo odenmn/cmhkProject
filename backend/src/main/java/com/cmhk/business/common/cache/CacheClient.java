@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
@@ -40,16 +42,16 @@ public class CacheClient {
             Duration ttl,
             Duration nullTtl
     ) {
-        T cachedValue = readCache(key, javaType);
-        if (cachedValue != null || isNullValue(key)) {
-            return cachedValue;
-        }
-
         String lockKey = LOCK_PREFIX + key;
         String lockValue = UUID.randomUUID().toString();
         boolean locked = false;
 
         try {
+            T cachedValue = readCache(key, javaType);
+            if (cachedValue != null || isNullValue(key)) {
+                return cachedValue;
+            }
+
             locked = tryLock(lockKey, lockValue);
             if (!locked) {
                 return retryReadCache(key, javaType, dbFallback);
@@ -84,6 +86,46 @@ public class CacheClient {
         } catch (Exception ex) {
             log.warn("删除 Redis 缓存失败，key={}，原因={}", key, ex.getMessage());
         }
+    }
+
+    /** 生成带命名空间版本的缓存键，避免筛选条件缓存逐个扫描删除。 */
+    public String versionedKey(String namespace, String discriminator) {
+        try {
+            String version = redisTemplate.opsForValue().get(versionKey(namespace));
+            return namespace + "v" + (StringUtils.hasText(version) ? version : "0") + ":" + discriminator;
+        } catch (Exception ex) {
+            log.warn("读取 Redis 缓存版本失败，使用默认版本，namespace={}，原因={}", namespace, ex.getMessage());
+            return namespace + "v0:" + discriminator;
+        }
+    }
+
+    /** 在数据库事务提交成功后提升缓存版本，事务外调用则立即执行。 */
+    public void invalidateNamespacesAfterCommit(String... namespaces) {
+        Runnable invalidation = () -> invalidateNamespaces(namespaces);
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            invalidation.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                invalidation.run();
+            }
+        });
+    }
+
+    private void invalidateNamespaces(String... namespaces) {
+        for (String namespace : namespaces) {
+            try {
+                redisTemplate.opsForValue().increment(versionKey(namespace));
+            } catch (Exception ex) {
+                log.warn("提升 Redis 缓存版本失败，namespace={}，原因={}", namespace, ex.getMessage());
+            }
+        }
+    }
+
+    private String versionKey(String namespace) {
+        return namespace + "version";
     }
 
     private <T> T retryReadCache(String key, JavaType javaType, Supplier<T> dbFallback) {

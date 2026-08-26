@@ -1,6 +1,7 @@
 package com.cmhk.business.module.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cmhk.business.common.cache.CacheClient;
 import com.cmhk.business.module.admin.dto.CustomerBackupImportResult;
 import com.cmhk.business.module.admin.dto.CustomerBackupSimulationPreview;
 import com.cmhk.business.module.admin.entity.CustomerBackupImport;
@@ -11,6 +12,7 @@ import com.cmhk.business.module.admin.mapper.CustomerBackupImportRowMapper;
 import com.cmhk.business.module.admin.mapper.IccidInventoryMapper;
 import com.cmhk.business.module.admin.service.CustomerBackupImportService;
 import com.cmhk.business.module.admin.service.CustomerBackupSimulationService;
+import com.cmhk.business.module.admin.service.AdminCacheKeys;
 import com.cmhk.business.module.admin.service.OperationLogService;
 import com.cmhk.business.module.channel.entity.Channel;
 import com.cmhk.business.module.channel.entity.ChannelEntry;
@@ -54,6 +56,7 @@ public class CustomerBackupImportServiceImpl implements CustomerBackupImportServ
     private final ChannelEntryMapper entryMapper;
     private final CustomerChannelBindingMapper bindingMapper;
     private final OperationLogService operationLogService;
+    private final CacheClient cacheClient;
 
     public CustomerBackupImportServiceImpl(
             CustomerBackupSimulationService simulationService,
@@ -65,7 +68,8 @@ public class CustomerBackupImportServiceImpl implements CustomerBackupImportServ
             ChannelMapper channelMapper,
             ChannelEntryMapper entryMapper,
             CustomerChannelBindingMapper bindingMapper,
-            OperationLogService operationLogService) {
+            OperationLogService operationLogService,
+            CacheClient cacheClient) {
         this.simulationService = simulationService;
         this.importMapper = importMapper;
         this.importRowMapper = importRowMapper;
@@ -76,6 +80,7 @@ public class CustomerBackupImportServiceImpl implements CustomerBackupImportServ
         this.entryMapper = entryMapper;
         this.bindingMapper = bindingMapper;
         this.operationLogService = operationLogService;
+        this.cacheClient = cacheClient;
     }
 
     /** 校验用户预览过的文件摘要，并在一个事务内完成幂等导入。 */
@@ -119,6 +124,13 @@ public class CustomerBackupImportServiceImpl implements CustomerBackupImportServ
                         "exceptions", batch.getExceptionCount()
                 ),
                 file.getOriginalFilename()
+        );
+        cacheClient.invalidateNamespacesAfterCommit(
+                AdminCacheKeys.CUSTOMERS,
+                AdminCacheKeys.CUSTOMER_CHANNELS,
+                AdminCacheKeys.ORDERS,
+                AdminCacheKeys.ICCIDS,
+                AdminCacheKeys.DASHBOARD
         );
         return counters.toResult(batch, preview.summary().totalRecords());
     }
