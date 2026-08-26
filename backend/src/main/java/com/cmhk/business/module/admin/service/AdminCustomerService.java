@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,11 +54,36 @@ public class AdminCustomerService {
     }
 
     public List<Customer> list(String keyword, String type, Integer status) {
-        return customerMapper.selectList(new LambdaQueryWrapper<Customer>()
+        List<Customer> customers = customerMapper.selectList(new LambdaQueryWrapper<Customer>()
                 .and(keyword != null && !keyword.isBlank(), q -> q.like(Customer::getName, keyword).or().like(Customer::getPhone, keyword))
                 .eq(type != null && !type.isBlank(), Customer::getCustomerType, type)
                 .eq(status != null, Customer::getCurrentStatus, status)
                 .orderByDesc(Customer::getId));
+        fillServiceNumbers(customers);
+        return customers;
+    }
+
+    /** 批量补充客户最新订单的上台号码，避免客户列表逐行查询订单。 */
+    private void fillServiceNumbers(List<Customer> customers) {
+        if (customers.isEmpty()) {
+            return;
+        }
+        List<Long> customerIds = customers.stream()
+                .map(Customer::getId)
+                .toList();
+        List<MobilePlanOrder> orders = orderMapper.selectList(new LambdaQueryWrapper<MobilePlanOrder>()
+                .in(MobilePlanOrder::getCustomerId, customerIds)
+                .isNotNull(MobilePlanOrder::getServiceNumber)
+                .orderByDesc(MobilePlanOrder::getId));
+        Map<Long, String> serviceNumberByCustomer = new HashMap<>();
+        for (MobilePlanOrder order : orders) {
+            if (order.getServiceNumber() != null && !order.getServiceNumber().isBlank()) {
+                serviceNumberByCustomer.putIfAbsent(order.getCustomerId(), order.getServiceNumber());
+            }
+        }
+        for (Customer customer : customers) {
+            customer.setServiceNumber(serviceNumberByCustomer.get(customer.getId()));
+        }
     }
 
     public Map<String, Object> detail(Long id) {
@@ -116,6 +142,7 @@ public class AdminCustomerService {
         copy.setChannelId(source.getChannelId()); copy.setIntendedPlan(source.getIntendedPlan());
         copy.setRequirementSummary(source.getRequirementSummary()); copy.setCurrentStatus(source.getCurrentStatus());
         copy.setSourceSystem(source.getSourceSystem()); copy.setSourceCustomerId(source.getSourceCustomerId());
+        copy.setServiceNumber(source.getServiceNumber());
         copy.setCreatedAt(source.getCreatedAt()); copy.setUpdatedAt(source.getUpdatedAt());
         return copy;
     }

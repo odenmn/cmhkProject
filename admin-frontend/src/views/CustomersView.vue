@@ -84,7 +84,7 @@ onMounted(load)
       <div class="table-toolbar"><span class="table-title">客户档案</span><span class="table-meta">共 {{ rows.length }} 位客户</span></div>
       <el-table :data="rows" v-loading="loading">
         <el-table-column prop="name" label="客户姓名" min-width="120" />
-        <el-table-column prop="phone" label="手机号" min-width="140" />
+        <el-table-column label="上台号码" min-width="140"><template #default="scope">{{ scope.row.serviceNumber || '—' }}</template></el-table-column>
         <el-table-column prop="contactMethod" label="联系方式" min-width="140" />
         <el-table-column label="归属类型" width="110"><template #default="scope">{{ scope.row.customerType === 'CHANNEL' ? '渠道客户' : '自营客户' }}</template></el-table-column>
         <el-table-column prop="customerCategory" label="客户类别" width="120" />

@@ -1,6 +1,7 @@
 package com.cmhk.business.module.customer.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -24,6 +25,9 @@ public class Customer {
     private Integer currentStatus;
     private String sourceSystem;
     private String sourceCustomerId;
+    /** 客户列表展示用的关联订单上台号码，不对应 customer 表字段。 */
+    @TableField(exist = false)
+    private String serviceNumber;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
