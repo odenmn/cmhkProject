@@ -18,6 +18,12 @@ public class IccidInventory {
     private LocalDateTime usedAt;
     private String operatorName;
     private String remark;
+    private String cardType;
+    private String serviceNumber;
+    private String sourceSystem;
+    private String sourceRecordId;
+    private Long replacedByIccidId;
+    private LocalDateTime replacedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -88,6 +88,14 @@ public class MobilePlanOrder {
 
     private String reconciliationStatus;
 
+    private String sourceRecordId;
+
+    private String sourceChannelName;
+
+    private String umallStatus;
+
+    private LocalDate onboardDate;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

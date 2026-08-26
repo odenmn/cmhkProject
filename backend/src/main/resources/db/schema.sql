@@ -449,10 +449,11 @@ DELIMITER ;
 CALL add_column_if_missing('customer', 'name', 'VARCHAR(64) NULL', 'phone_verified_at');
 CALL add_column_if_missing('customer', 'contact_method', 'VARCHAR(128) NULL', 'name');
 CALL add_column_if_missing('customer', 'customer_type', 'VARCHAR(32) NOT NULL DEFAULT ''DIRECT''', 'contact_method');
-CALL add_column_if_missing('customer', 'channel_id', 'BIGINT NULL', 'customer_type');
+CALL add_column_if_missing('customer', 'customer_category', 'VARCHAR(32) NULL COMMENT ''业务客户类别，例如留学生、地产客户、研究生''', 'customer_type');
+CALL add_column_if_missing('customer', 'channel_id', 'BIGINT NULL', 'customer_category');
 CALL add_column_if_missing('customer', 'intended_plan', 'VARCHAR(128) NULL', 'channel_id');
 CALL add_column_if_missing('customer', 'requirement_summary', 'VARCHAR(512) NULL', 'intended_plan');
-CALL add_column_if_missing('customer', 'current_status', 'VARCHAR(32) NOT NULL DEFAULT ''待处理''', 'requirement_summary');
+CALL add_column_if_missing('customer', 'current_status', 'TINYINT NOT NULL DEFAULT 0 COMMENT ''客户状态码：0待处理，1跟进中，2待资料，3办理中，4待激活，5已激活，6已完成，9无效''', 'requirement_summary');
 
 CALL add_column_if_missing('mobile_plan_order', 'umall_order_no', 'VARCHAR(64) NULL', 'status');
 CALL add_column_if_missing('mobile_plan_order', 'service_number', 'VARCHAR(32) NULL', 'umall_order_no');

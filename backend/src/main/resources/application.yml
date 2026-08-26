@@ -17,9 +17,9 @@ spring:
       max-request-size: 10MB
   data:
     redis:
-      host: ${REDIS_HOST:}
-      port: ${REDIS_PORT:}
-      database: ${REDIS_DATABASE:}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
       password: ${REDIS_PASSWORD:}
 
 mybatis-plus:
@@ -31,7 +31,7 @@ mybatis-plus:
 
 logging:
   level:
-    com.cmhk.business: debug
+    com.cmhk.business: info
 
 cmhk:
   auth:

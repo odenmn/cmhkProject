@@ -17,10 +17,13 @@ public class Customer {
     private String name;
     private String contactMethod;
     private String customerType;
+    private String customerCategory;
     private Long channelId;
     private String intendedPlan;
     private String requirementSummary;
-    private String currentStatus;
+    private Integer currentStatus;
+    private String sourceSystem;
+    private String sourceCustomerId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
