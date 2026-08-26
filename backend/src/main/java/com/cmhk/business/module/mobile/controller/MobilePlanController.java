@@ -1,6 +1,7 @@
 package com.cmhk.business.module.mobile.controller;
 
 import com.cmhk.business.common.ApiResponse;
+import com.cmhk.business.config.TokenAuthInterceptor;
 import com.cmhk.business.module.mobile.dto.MobilePlanOrderCreateRequest;
 import com.cmhk.business.module.mobile.entity.MobilePlan;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -57,11 +59,14 @@ public class MobilePlanController {
     }
 
     @PostMapping("/orders")
-    public ApiResponse<MobilePlanOrder> createOrder(@Valid @RequestBody MobilePlanOrderCreateRequest request) {
+    public ApiResponse<MobilePlanOrder> createOrder(
+            @RequestAttribute(TokenAuthInterceptor.AUTHENTICATED_CUSTOMER_ID) Long customerId,
+            @Valid @RequestBody MobilePlanOrderCreateRequest request
+    ) {
         log.info("开始创建移动套餐转人工订单，planCode={}", request.getPlanCode());
-        MobilePlanOrder order = mobilePlanOrderService.createTransferOrder(request);
-        log.info("移动套餐转人工订单创建完成，orderNo={}，planCode={}，status={}",
-                order.getOrderNo(), order.getPlanCode(), order.getStatus());
+        MobilePlanOrder order = mobilePlanOrderService.createTransferOrder(customerId, request);
+        log.info("移动套餐转人工订单创建完成，orderNo={}，customerId={}，planCode={}，status={}",
+                order.getOrderNo(), order.getCustomerId(), order.getPlanCode(), order.getStatus());
         return ApiResponse.success(order);
     }
 }

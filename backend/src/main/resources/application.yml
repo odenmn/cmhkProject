@@ -11,6 +11,10 @@ spring:
     url: ${DB_URL:}
     username: ${DB_USERNAME:}
     password: ${DB_PASSWORD:}
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
   data:
     redis:
       host: ${REDIS_HOST:}
@@ -33,3 +37,8 @@ cmhk:
   auth:
     token-secret: ${AUTH_TOKEN_SECRET:}
     access-token-ttl-hours: ${AUTH_TOKEN_TTL_HOURS:24}
+  admin:
+    username: ${ADMIN_USERNAME:admin}
+    password: ${ADMIN_PASSWORD:}
+    token-secret: ${ADMIN_TOKEN_SECRET:${AUTH_TOKEN_SECRET:}}
+    access-token-ttl-hours: ${ADMIN_TOKEN_TTL_HOURS:12}

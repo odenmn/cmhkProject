@@ -6,6 +6,5 @@ import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
 
 public interface MobilePlanOrderService extends IService<MobilePlanOrder> {
 
-    MobilePlanOrder createTransferOrder(MobilePlanOrderCreateRequest request);
+    MobilePlanOrder createTransferOrder(Long customerId, MobilePlanOrderCreateRequest request);
 }
-

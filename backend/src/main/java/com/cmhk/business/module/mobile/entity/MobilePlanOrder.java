@@ -18,6 +18,8 @@ public class MobilePlanOrder {
 
     private String orderNo;
 
+    private Long customerId;
+
     private Long planId;
 
     private String planCode;
@@ -73,6 +75,18 @@ public class MobilePlanOrder {
     private String remark;
 
     private String status;
+
+    private String umallOrderNo;
+
+    private String serviceNumber;
+
+    private String activationStatus;
+
+    private String contractStatus;
+
+    private String orderSource;
+
+    private String reconciliationStatus;
 
     private LocalDateTime createdAt;
 

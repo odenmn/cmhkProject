@@ -70,6 +70,7 @@ export interface MobilePlanOrderCreateRequest {
 export interface MobilePlanOrder {
   id?: number
   orderNo: string
+  customerId?: number
   planId?: number
   planCode: string
   planName: string

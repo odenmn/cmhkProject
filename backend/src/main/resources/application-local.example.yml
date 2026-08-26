@@ -13,3 +13,8 @@ spring:
 cmhk:
   auth:
     token-secret: replace_with_a_random_local_token_secret
+  admin:
+    username: admin
+    password: replace_with_a_strong_admin_password
+    token-secret: replace_with_an_independent_random_secret
+    access-token-ttl-hours: 12

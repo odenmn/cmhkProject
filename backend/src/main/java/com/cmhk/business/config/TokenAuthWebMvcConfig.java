@@ -20,6 +20,7 @@ public class TokenAuthWebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/api/health",
                         "/api/business-types",
+                        "/api/admin/**",
                         "/api/channel-auth/entry",
                         "/api/channel-auth/verification-codes",
                         "/api/channel-auth/phone-login"

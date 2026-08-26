@@ -1,6 +1,8 @@
 package com.cmhk.business.module.mobile.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cmhk.business.module.customer.entity.Customer;
+import com.cmhk.business.module.customer.mapper.CustomerMapper;
 import com.cmhk.business.module.mobile.dto.MobilePlanOrderCreateRequest;
 import com.cmhk.business.module.mobile.entity.MobilePlan;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
@@ -19,13 +21,19 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
     private static final int CUSTOMER_IDENTITY_OVERSEAS_STUDENT = 1;
 
     private final MobilePlanService mobilePlanService;
+    private final CustomerMapper customerMapper;
 
-    public MobilePlanOrderServiceImpl(MobilePlanService mobilePlanService) {
+    public MobilePlanOrderServiceImpl(MobilePlanService mobilePlanService, CustomerMapper customerMapper) {
         this.mobilePlanService = mobilePlanService;
+        this.customerMapper = customerMapper;
     }
 
     @Override
-    public MobilePlanOrder createTransferOrder(MobilePlanOrderCreateRequest request) {
+    public MobilePlanOrder createTransferOrder(Long customerId, MobilePlanOrderCreateRequest request) {
+        Customer customer = customerMapper.selectById(customerId);
+        if (customer == null) {
+            throw new IllegalArgumentException("登录客户不存在，请重新登录");
+        }
         MobilePlan plan = mobilePlanService.lambdaQuery()
                 .eq(MobilePlan::getPlanCode, request.getPlanCode())
                 .eq(MobilePlan::getEnabled, 1)
@@ -37,6 +45,7 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
 
         MobilePlanOrder order = new MobilePlanOrder();
         order.setOrderNo(generateOrderNo());
+        order.setCustomerId(customer.getId());
         order.setPlanId(plan.getId());
         order.setPlanCode(plan.getPlanCode());
         order.setPlanName(plan.getPlanName());

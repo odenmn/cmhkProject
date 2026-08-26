@@ -81,6 +81,21 @@ BEGIN
 END//
 DELIMITER ;
 
+CREATE TABLE IF NOT EXISTS admin_user (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(64) NOT NULL UNIQUE,
+    password_hash VARCHAR(100) NOT NULL,
+    display_name VARCHAR(64) NOT NULL,
+    phone VARCHAR(32),
+    email VARCHAR(128),
+    role_code VARCHAR(32) NOT NULL DEFAULT 'ADMIN',
+    status VARCHAR(16) NOT NULL DEFAULT 'ENABLED',
+    last_login_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_admin_user_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CALL add_column_if_missing('mobile_plan', 'plan_type', 'VARCHAR(64) NOT NULL DEFAULT ''移动套餐''', 'plan_name');
 CALL add_column_if_missing('mobile_plan', 'channel_price_text', 'VARCHAR(64) NOT NULL DEFAULT ''''', 'monthly_fee');
 CALL add_column_if_missing('mobile_plan', 'effective_monthly_fee', 'DECIMAL(10, 2) NULL', 'channel_price_text');
@@ -211,6 +226,7 @@ ON DUPLICATE KEY UPDATE
 CREATE TABLE IF NOT EXISTS mobile_plan_order (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_no VARCHAR(64) NOT NULL UNIQUE,
+    customer_id BIGINT NOT NULL,
     plan_id BIGINT,
     plan_code VARCHAR(64) NOT NULL,
     plan_name VARCHAR(128) NOT NULL,
@@ -242,11 +258,13 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_mobile_plan_order_plan_id (plan_id),
+    INDEX idx_mobile_plan_order_customer_id (customer_id),
     INDEX idx_mobile_plan_order_plan_code (plan_code),
     INDEX idx_mobile_plan_order_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CALL add_column_if_missing('mobile_plan_order', 'plan_id', 'BIGINT NULL', 'order_no');
+CALL add_column_if_missing('mobile_plan_order', 'customer_id', 'BIGINT NULL', 'order_no');
 CALL add_column_if_missing('mobile_plan_order', 'plan_type', 'VARCHAR(64) NULL', 'plan_name');
 CALL add_column_if_missing('mobile_plan_order', 'channel_price_text', 'VARCHAR(64) NULL', 'monthly_fee');
 CALL add_column_if_missing('mobile_plan_order', 'effective_monthly_fee', 'DECIMAL(10, 2) NULL', 'channel_price_text');
@@ -399,7 +417,199 @@ END//
 DELIMITER ;
 
 CALL add_index_if_missing('mobile_plan_order', 'idx_mobile_plan_order_plan_id', '(plan_id)');
+CALL add_index_if_missing('mobile_plan_order', 'idx_mobile_plan_order_customer_id', '(customer_id)');
 
 DROP PROCEDURE IF EXISTS add_column_if_missing;
 DROP PROCEDURE IF EXISTS drop_column_if_exists;
 DROP PROCEDURE IF EXISTS add_index_if_missing;
+
+-- JOINCOM 管理后台 MVP：客户、订单、ICCID、甲方对账和二级渠道结算。
+DROP PROCEDURE IF EXISTS add_column_if_missing;
+DELIMITER //
+CREATE PROCEDURE add_column_if_missing(
+    IN target_table VARCHAR(64),
+    IN target_column VARCHAR(64),
+    IN column_definition VARCHAR(512),
+    IN after_column VARCHAR(64)
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = target_table AND column_name = target_column
+    ) THEN
+        SET @ddl = CONCAT('ALTER TABLE ', target_table, ' ADD COLUMN ', target_column, ' ', column_definition,
+            IF(after_column IS NULL OR after_column = '', '', CONCAT(' AFTER ', after_column)));
+        PREPARE stmt FROM @ddl;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END//
+DELIMITER ;
+
+CALL add_column_if_missing('customer', 'name', 'VARCHAR(64) NULL', 'phone_verified_at');
+CALL add_column_if_missing('customer', 'contact_method', 'VARCHAR(128) NULL', 'name');
+CALL add_column_if_missing('customer', 'customer_type', 'VARCHAR(32) NOT NULL DEFAULT ''DIRECT''', 'contact_method');
+CALL add_column_if_missing('customer', 'channel_id', 'BIGINT NULL', 'customer_type');
+CALL add_column_if_missing('customer', 'intended_plan', 'VARCHAR(128) NULL', 'channel_id');
+CALL add_column_if_missing('customer', 'requirement_summary', 'VARCHAR(512) NULL', 'intended_plan');
+CALL add_column_if_missing('customer', 'current_status', 'VARCHAR(32) NOT NULL DEFAULT ''待处理''', 'requirement_summary');
+
+CALL add_column_if_missing('mobile_plan_order', 'umall_order_no', 'VARCHAR(64) NULL', 'status');
+CALL add_column_if_missing('mobile_plan_order', 'service_number', 'VARCHAR(32) NULL', 'umall_order_no');
+CALL add_column_if_missing('mobile_plan_order', 'activation_status', 'VARCHAR(32) NULL', 'service_number');
+CALL add_column_if_missing('mobile_plan_order', 'contract_status', 'VARCHAR(32) NULL', 'activation_status');
+CALL add_column_if_missing('mobile_plan_order', 'order_source', 'VARCHAR(32) NOT NULL DEFAULT ''H5''', 'contract_status');
+CALL add_column_if_missing('mobile_plan_order', 'reconciliation_status', 'VARCHAR(32) NOT NULL DEFAULT ''待对账''', 'order_source');
+
+CREATE TABLE IF NOT EXISTS iccid_inventory (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    iccid VARCHAR(32) NOT NULL UNIQUE,
+    batch_no VARCHAR(64),
+    status VARCHAR(16) NOT NULL DEFAULT 'AVAILABLE',
+    current_customer_id BIGINT,
+    current_order_id BIGINT,
+    assigned_at DATETIME,
+    used_at DATETIME,
+    operator_name VARCHAR(64),
+    remark VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_iccid_status (status),
+    INDEX idx_iccid_customer (current_customer_id),
+    INDEX idx_iccid_order (current_order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS iccid_assignment_history (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    iccid_id BIGINT NOT NULL,
+    iccid VARCHAR(32) NOT NULL,
+    customer_id BIGINT,
+    order_id BIGINT,
+    action_type VARCHAR(32) NOT NULL,
+    operator_name VARCHAR(64) NOT NULL,
+    reason VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_iccid_history_iccid (iccid_id),
+    INDEX idx_iccid_history_order (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cmhk_reconciliation_import (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    file_name VARCHAR(255) NOT NULL,
+    file_hash CHAR(64) NOT NULL,
+    status VARCHAR(24) NOT NULL,
+    total_count INT NOT NULL DEFAULT 0,
+    success_count INT NOT NULL DEFAULT 0,
+    failed_count INT NOT NULL DEFAULT 0,
+    unmatched_count INT NOT NULL DEFAULT 0,
+    operator_name VARCHAR(64) NOT NULL,
+    confirmed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_reconciliation_file_hash (file_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cmhk_reconciliation_row (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    import_id BIGINT NOT NULL,
+    source_row_number INT,
+    raw_data JSON,
+    umall_order_no VARCHAR(64),
+    iccid VARCHAR(32),
+    phone VARCHAR(32),
+    plan_name VARCHAR(128),
+    review_status VARCHAR(32),
+    supplement_status VARCHAR(128),
+    activation_status VARCHAR(32),
+    contract_status VARCHAR(32),
+    commission_amount DECIMAL(12,2),
+    matched_order_id BIGINT,
+    match_method VARCHAR(32),
+    match_status VARCHAR(24) NOT NULL,
+    exception_reason VARCHAR(512),
+    resolved_at DATETIME,
+    resolved_by VARCHAR(64),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_reconciliation_row_import (import_id),
+    INDEX idx_reconciliation_row_status (match_status),
+    INDEX idx_reconciliation_row_order (matched_order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS secondary_channel (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    channel_code VARCHAR(64) NOT NULL UNIQUE,
+    channel_name VARCHAR(128) NOT NULL,
+    contact_name VARCHAR(64),
+    contact_phone VARCHAR(32),
+    settlement_info VARCHAR(512),
+    status VARCHAR(16) NOT NULL DEFAULT 'ENABLED',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS secondary_commission_rule (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    rule_name VARCHAR(128) NOT NULL,
+    plan_code VARCHAR(64),
+    plan_name VARCHAR(128),
+    monthly_fee DECIMAL(12,2) NOT NULL,
+    contract_months INT NOT NULL,
+    main_multiplier DECIMAL(10,4) NOT NULL DEFAULT 0,
+    extra_multiplier DECIMAL(10,4) NOT NULL DEFAULT 0,
+    promotion_multiplier DECIMAL(10,4) NOT NULL DEFAULT 0,
+    channel_multiplier DECIMAL(10,4) NOT NULL DEFAULT 0,
+    default_channel_subsidy DECIMAL(12,2) NOT NULL DEFAULT 0,
+    default_joincom_subsidy DECIMAL(12,2) NOT NULL DEFAULT 0,
+    effective_from DATE,
+    effective_to DATE,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_secondary_rule_plan (plan_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS secondary_commission_record (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
+    channel_id BIGINT NOT NULL,
+    rule_id BIGINT NOT NULL,
+    rule_snapshot JSON NOT NULL,
+    promotion_applied TINYINT NOT NULL DEFAULT 0,
+    joincom_total DECIMAL(12,2) NOT NULL,
+    channel_gross DECIMAL(12,2) NOT NULL,
+    channel_subsidy DECIMAL(12,2) NOT NULL DEFAULT 0,
+    joincom_subsidy DECIMAL(12,2) NOT NULL DEFAULT 0,
+    channel_payable DECIMAL(12,2) NOT NULL,
+    joincom_retained DECIMAL(12,2) NOT NULL,
+    t1_amount DECIMAL(12,2) NOT NULL,
+    t3_amount DECIMAL(12,2) NOT NULL,
+    t7_amount DECIMAL(12,2) NOT NULL,
+    adjustment_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    final_amount DECIMAL(12,2) NOT NULL,
+    adjustment_reason VARCHAR(512),
+    status VARCHAR(24) NOT NULL DEFAULT 'PENDING',
+    confirmed_by VARCHAR(64),
+    confirmed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_secondary_commission_order (order_id),
+    INDEX idx_secondary_commission_channel (channel_id),
+    INDEX idx_secondary_commission_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS operation_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_name VARCHAR(64) NOT NULL,
+    operation_type VARCHAR(64) NOT NULL,
+    object_type VARCHAR(64) NOT NULL,
+    object_id VARCHAR(64),
+    before_data JSON,
+    after_data JSON,
+    remark VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_operation_log_object (object_type, object_id),
+    INDEX idx_operation_log_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP PROCEDURE IF EXISTS add_column_if_missing;
