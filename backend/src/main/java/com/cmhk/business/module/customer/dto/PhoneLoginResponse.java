@@ -1,4 +1,4 @@
-package com.cmhk.business.module.auth.dto;
+package com.cmhk.business.module.customer.dto;
 
 public record PhoneLoginResponse(
         Long customerId,

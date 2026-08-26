@@ -1,6 +1,6 @@
-package com.cmhk.business.module.auth.service.impl;
+package com.cmhk.business.module.customer.security;
 
-import com.cmhk.business.module.auth.service.AccessTokenService;
+import com.cmhk.business.module.customer.security.AccessTokenService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 

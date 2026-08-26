@@ -1,4 +1,4 @@
-package com.cmhk.business.module.auth.dto;
+package com.cmhk.business.module.channel.dto;
 
 public record ChannelEntryContextResponse(
         String entryToken,

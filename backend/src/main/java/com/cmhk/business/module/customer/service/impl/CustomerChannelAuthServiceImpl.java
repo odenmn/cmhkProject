@@ -1,22 +1,22 @@
-package com.cmhk.business.module.auth.service.impl;
+package com.cmhk.business.module.customer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cmhk.business.module.auth.dto.ChannelEntryContextResponse;
-import com.cmhk.business.module.auth.dto.PhoneLoginRequest;
-import com.cmhk.business.module.auth.dto.PhoneLoginResponse;
-import com.cmhk.business.module.auth.dto.VerificationCodeSendRequest;
-import com.cmhk.business.module.auth.entity.Channel;
-import com.cmhk.business.module.auth.entity.ChannelEntry;
-import com.cmhk.business.module.auth.entity.Customer;
-import com.cmhk.business.module.auth.entity.CustomerChannelBinding;
-import com.cmhk.business.module.auth.entity.PhoneVerificationCode;
-import com.cmhk.business.module.auth.mapper.ChannelEntryMapper;
-import com.cmhk.business.module.auth.mapper.ChannelMapper;
-import com.cmhk.business.module.auth.mapper.CustomerChannelBindingMapper;
-import com.cmhk.business.module.auth.mapper.CustomerMapper;
-import com.cmhk.business.module.auth.mapper.PhoneVerificationCodeMapper;
-import com.cmhk.business.module.auth.service.ChannelAuthService;
-import com.cmhk.business.module.auth.service.AccessTokenService;
+import com.cmhk.business.module.channel.dto.ChannelEntryContextResponse;
+import com.cmhk.business.module.customer.dto.PhoneLoginRequest;
+import com.cmhk.business.module.customer.dto.PhoneLoginResponse;
+import com.cmhk.business.module.customer.dto.VerificationCodeSendRequest;
+import com.cmhk.business.module.channel.entity.Channel;
+import com.cmhk.business.module.channel.entity.ChannelEntry;
+import com.cmhk.business.module.channel.entity.CustomerChannelBinding;
+import com.cmhk.business.module.channel.mapper.ChannelEntryMapper;
+import com.cmhk.business.module.channel.mapper.ChannelMapper;
+import com.cmhk.business.module.channel.mapper.CustomerChannelBindingMapper;
+import com.cmhk.business.module.customer.entity.Customer;
+import com.cmhk.business.module.customer.entity.PhoneVerificationCode;
+import com.cmhk.business.module.customer.mapper.CustomerMapper;
+import com.cmhk.business.module.customer.mapper.PhoneVerificationCodeMapper;
+import com.cmhk.business.module.customer.security.AccessTokenService;
+import com.cmhk.business.module.customer.service.CustomerChannelAuthService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +26,8 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 
 @Service
-public class ChannelAuthServiceImpl implements ChannelAuthService {
+/** 客户登录流程实现：验证入口、验证码、客户档案和首次渠道绑定。 */
+public class CustomerChannelAuthServiceImpl implements CustomerChannelAuthService {
 
     private static final String MOCK_CODE = "123456";
     private static final String CODE_STATUS_SENT = "SENT";
@@ -40,7 +41,7 @@ public class ChannelAuthServiceImpl implements ChannelAuthService {
     private final PhoneVerificationCodeMapper phoneVerificationCodeMapper;
     private final AccessTokenService accessTokenService;
 
-    public ChannelAuthServiceImpl(ChannelMapper channelMapper, ChannelEntryMapper channelEntryMapper,
+    public CustomerChannelAuthServiceImpl(ChannelMapper channelMapper, ChannelEntryMapper channelEntryMapper,
                                   CustomerMapper customerMapper, CustomerChannelBindingMapper customerChannelBindingMapper,
                                   PhoneVerificationCodeMapper phoneVerificationCodeMapper,
                                   AccessTokenService accessTokenService) {

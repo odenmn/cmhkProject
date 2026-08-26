@@ -1,4 +1,4 @@
-package com.cmhk.business.module.auth.dto;
+package com.cmhk.business.module.customer.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

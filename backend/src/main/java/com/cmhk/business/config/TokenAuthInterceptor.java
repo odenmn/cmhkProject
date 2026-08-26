@@ -1,7 +1,7 @@
 package com.cmhk.business.config;
 
 import com.cmhk.business.common.ApiResponse;
-import com.cmhk.business.module.auth.service.AccessTokenService;
+import com.cmhk.business.module.customer.security.AccessTokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

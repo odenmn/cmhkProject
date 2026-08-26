@@ -1,4 +1,4 @@
-package com.cmhk.business.module.auth.entity;
+package com.cmhk.business.module.channel.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
