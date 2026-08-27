@@ -61,9 +61,6 @@ public class CustomerBackupSimulationServiceImpl implements CustomerBackupSimula
         int validRealIccidRows = 0;
 
         for (SourceRow row : sourceRows) {
-            if (row.onboarded()) {
-                onboardedRecords++;
-            }
             if (isValidRealIccid(row.iccid())) {
                 validRealIccidRows++;
             }
@@ -73,9 +70,16 @@ public class CustomerBackupSimulationServiceImpl implements CustomerBackupSimula
 
             String sourceCustomerKey = ORDER_SOURCE + ":" + row.sourceId();
             String orderNo = stableOrderNo(row.sourceId());
-            customers.add(toCustomer(row, sourceCustomerKey));
-            orders.add(toOrder(row, sourceCustomerKey, orderNo));
-            addIccidCandidate(row, sourceCustomerKey, orderNo, validIccidCounts,
+            int customerStatus = CustomerStatusCode.fromBackup(row.stage(), row.hasOnboardDate());
+            boolean onboarded = CustomerStatusCode.isOnboarded(customerStatus);
+            if (onboarded) {
+                onboardedRecords++;
+            }
+            customers.add(toCustomer(row, sourceCustomerKey, customerStatus));
+            if (onboarded) {
+                orders.add(toOrder(row, sourceCustomerKey, orderNo));
+            }
+            addIccidCandidate(row, sourceCustomerKey, onboarded ? orderNo : null, onboarded, validIccidCounts,
                     reservedIccids, iccids, exceptions);
         }
 
@@ -214,7 +218,7 @@ public class CustomerBackupSimulationServiceImpl implements CustomerBackupSimula
         return true;
     }
 
-    private CustomerCandidate toCustomer(SourceRow row, String sourceCustomerKey) {
+    private CustomerCandidate toCustomer(SourceRow row, String sourceCustomerKey, int customerStatus) {
         return new CustomerCandidate(
                 row.rowNumber(),
                 row.sourceId(),
@@ -224,7 +228,7 @@ public class CustomerBackupSimulationServiceImpl implements CustomerBackupSimula
                 row.channel().isBlank() ? "DIRECT" : "CHANNEL",
                 row.customerType(),
                 preferredPlan(row),
-                CustomerStatusCode.fromBackup(row.stage(), row.onboarded())
+                customerStatus
         );
     }
 
@@ -239,7 +243,7 @@ public class CustomerBackupSimulationServiceImpl implements CustomerBackupSimula
                 defaultText(row.stage(), "待处理"),
                 row.umallStatus(),
                 row.onboardDate(),
-                row.onboarded(),
+                true,
                 ORDER_SOURCE
         );
     }
@@ -248,12 +252,13 @@ public class CustomerBackupSimulationServiceImpl implements CustomerBackupSimula
             SourceRow row,
             String sourceCustomerKey,
             String orderNo,
+            boolean onboarded,
             Map<String, Integer> validIccidCounts,
             Set<String> reservedIccids,
             List<IccidCandidate> iccids,
             List<ExceptionCandidate> exceptions) {
         if (row.iccid().isBlank()) {
-            addVirtualIccid(row, sourceCustomerKey, orderNo, reservedIccids, iccids, exceptions);
+            addVirtualIccid(row, sourceCustomerKey, orderNo, onboarded, reservedIccids, iccids, exceptions);
             return;
         }
         if (!isValidRealIccid(row.iccid())) {
@@ -267,8 +272,8 @@ public class CustomerBackupSimulationServiceImpl implements CustomerBackupSimula
             return;
         }
 
-        boolean bound = row.onboarded() && !row.serviceNumber().isBlank();
-        if (row.onboarded() && row.serviceNumber().isBlank()) {
+        boolean bound = onboarded && !row.serviceNumber().isBlank();
+        if (onboarded && row.serviceNumber().isBlank()) {
             exceptions.add(exception(row, "SERVICE_NUMBER_MISSING", "已上台记录缺少上台号码，ICCID 仅进入可用卡池", null));
         }
         iccids.add(new IccidCandidate(
@@ -288,10 +293,11 @@ public class CustomerBackupSimulationServiceImpl implements CustomerBackupSimula
             SourceRow row,
             String sourceCustomerKey,
             String orderNo,
+            boolean onboarded,
             Set<String> reservedIccids,
             List<IccidCandidate> iccids,
             List<ExceptionCandidate> exceptions) {
-        if (!row.onboarded()) {
+        if (!onboarded) {
             return;
         }
         if (row.serviceNumber().isBlank()) {
@@ -411,7 +417,8 @@ public class CustomerBackupSimulationServiceImpl implements CustomerBackupSimula
             String iccid
     ) {
 
-        private boolean onboarded() {
+        /** 上台日期仅用于映射来源状态，不直接作为是否创建订单的判断条件。 */
+        private boolean hasOnboardDate() {
             return onboardDate != null && !onboardDate.isBlank();
         }
     }

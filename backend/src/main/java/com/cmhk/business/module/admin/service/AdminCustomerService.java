@@ -8,11 +8,14 @@ import com.cmhk.business.module.admin.entity.SecondaryCommissionRecord;
 import com.cmhk.business.module.admin.mapper.IccidInventoryMapper;
 import com.cmhk.business.module.admin.mapper.ReconciliationRowMapper;
 import com.cmhk.business.module.admin.mapper.SecondaryCommissionRecordMapper;
+import com.cmhk.business.module.admin.security.AdminPrincipal;
+import com.cmhk.business.module.channel.entity.CustomerChannelBinding;
 import com.cmhk.business.module.customer.entity.Customer;
 import com.cmhk.business.module.customer.entity.CustomerStatusCode;
 import com.cmhk.business.module.customer.mapper.CustomerMapper;
 import com.cmhk.business.module.channel.entity.Channel;
 import com.cmhk.business.module.channel.mapper.ChannelMapper;
+import com.cmhk.business.module.channel.mapper.CustomerChannelBindingMapper;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
 import com.fasterxml.jackson.databind.JavaType;
@@ -39,6 +42,7 @@ public class AdminCustomerService {
     private final SecondaryCommissionRecordMapper commissionRecordMapper;
     private final OperationLogService logService;
     private final ChannelMapper channelMapper;
+    private final CustomerChannelBindingMapper bindingMapper;
     private final CacheClient cacheClient;
     private final JavaType customerListType;
     private final JavaType channelListType;
@@ -47,7 +51,8 @@ public class AdminCustomerService {
     public AdminCustomerService(CustomerMapper customerMapper, MobilePlanOrderMapper orderMapper,
                                 IccidInventoryMapper iccidMapper, ReconciliationRowMapper reconciliationRowMapper,
                                 SecondaryCommissionRecordMapper commissionRecordMapper, OperationLogService logService,
-                                ChannelMapper channelMapper, CacheClient cacheClient, ObjectMapper objectMapper) {
+                                ChannelMapper channelMapper, CustomerChannelBindingMapper bindingMapper,
+                                CacheClient cacheClient, ObjectMapper objectMapper) {
         this.customerMapper = customerMapper;
         this.orderMapper = orderMapper;
         this.iccidMapper = iccidMapper;
@@ -55,6 +60,7 @@ public class AdminCustomerService {
         this.commissionRecordMapper = commissionRecordMapper;
         this.logService = logService;
         this.channelMapper = channelMapper;
+        this.bindingMapper = bindingMapper;
         this.cacheClient = cacheClient;
         this.customerListType = objectMapper.getTypeFactory()
                 .constructCollectionType(List.class, Customer.class);
@@ -74,6 +80,14 @@ public class AdminCustomerService {
                 Duration.ofMinutes(15),
                 EMPTY_CACHE_TTL
         );
+    }
+
+    public List<Channel> channels(AdminPrincipal principal) {
+        if (principal != null && "CHANNEL".equals(principal.scopeType())) {
+            Channel channel = channelMapper.selectById(principal.scopeId());
+            return channel == null ? List.of() : List.of(channel);
+        }
+        return channels();
     }
 
     private List<Channel> channelsFromDatabase() {
@@ -96,11 +110,23 @@ public class AdminCustomerService {
         );
     }
 
+    public List<Customer> list(String keyword, String type, Integer status, AdminPrincipal principal) {
+        if (principal == null || !"CHANNEL".equals(principal.scopeType())) {
+            return list(keyword, type, status);
+        }
+        return listFromDatabase(keyword, type, status, principal.scopeId());
+    }
+
     private List<Customer> listFromDatabase(String keyword, String type, Integer status) {
+        return listFromDatabase(keyword, type, status, null);
+    }
+
+    private List<Customer> listFromDatabase(String keyword, String type, Integer status, Long channelId) {
         List<Customer> customers = customerMapper.selectList(new LambdaQueryWrapper<Customer>()
                 .and(keyword != null && !keyword.isBlank(), q -> q.like(Customer::getName, keyword).or().like(Customer::getPhone, keyword))
                 .eq(type != null && !type.isBlank(), Customer::getCustomerType, type)
                 .eq(status != null, Customer::getCurrentStatus, status)
+                .eq(channelId != null, Customer::getChannelId, channelId)
                 .orderByDesc(Customer::getId));
         fillServiceNumbers(customers);
         return customers;
@@ -140,6 +166,12 @@ public class AdminCustomerService {
         );
     }
 
+    public Map<String, Object> detail(Long id, AdminPrincipal principal) {
+        Customer customer = required(id);
+        requireChannelAccess(customer.getChannelId(), principal);
+        return detail(id);
+    }
+
     private Map<String, Object> detailFromDatabase(Long id) {
         Customer customer = required(id);
         List<MobilePlanOrder> orders = orderMapper.selectList(new LambdaQueryWrapper<MobilePlanOrder>()
@@ -170,14 +202,18 @@ public class AdminCustomerService {
         target.setContactMethod(input.getContactMethod());
         target.setCustomerType(input.getCustomerType() == null ? "DIRECT" : input.getCustomerType());
         target.setCustomerCategory(input.getCustomerCategory());
-        target.setChannelId(input.getChannelId());
+        Channel selectedChannel = requireChannel(input.getChannelId());
+        target.setChannelId(selectedChannel.getId());
         target.setIntendedPlan(input.getIntendedPlan());
         target.setRequirementSummary(input.getRequirementSummary());
         target.setCurrentStatus(input.getCurrentStatus() == null ? CustomerStatusCode.PENDING : input.getCurrentStatus());
         if (id == null) {
             target.setPhoneVerifiedAt(LocalDateTime.now());
             customerMapper.insert(target);
-        } else customerMapper.updateById(target);
+        } else {
+            customerMapper.updateById(target);
+        }
+        syncBinding(target.getId(), selectedChannel.getId());
         logService.record(operator, id == null ? "CUSTOMER_CREATE" : "CUSTOMER_UPDATE", "CUSTOMER", target.getId(), before, target, null);
         cacheClient.invalidateNamespacesAfterCommit(
                 AdminCacheKeys.CUSTOMERS,
@@ -185,6 +221,53 @@ public class AdminCustomerService {
                 AdminCacheKeys.DASHBOARD
         );
         return target;
+    }
+
+    public Customer save(Long id, Customer input, AdminPrincipal principal) {
+        if (id != null) {
+            requireChannelAccess(required(id).getChannelId(), principal);
+        }
+        requireChannelAccess(input.getChannelId(), principal);
+        return save(id, input, principal.username());
+    }
+
+    /** 绑定表是业务事实，后台修改渠道时必须同步更新绑定记录。 */
+    private void syncBinding(Long customerId, Long channelId) {
+        CustomerChannelBinding binding = bindingMapper.selectOne(
+                new LambdaQueryWrapper<CustomerChannelBinding>()
+                        .eq(CustomerChannelBinding::getCustomerId, customerId));
+        if (binding == null) {
+            binding = new CustomerChannelBinding();
+            binding.setCustomerId(customerId);
+            binding.setChannelId(channelId);
+            binding.setBoundAt(LocalDateTime.now());
+            bindingMapper.insert(binding);
+            return;
+        }
+        if (!channelId.equals(binding.getChannelId())) {
+            binding.setChannelId(channelId);
+            binding.setEntryId(null);
+            bindingMapper.updateById(binding);
+        }
+    }
+
+    private Channel requireChannel(Long channelId) {
+        if (channelId == null) {
+            throw new IllegalArgumentException("请选择有效渠道");
+        }
+        Channel channel = channelMapper.selectById(channelId);
+        if (channel == null) {
+            throw new IllegalArgumentException("请选择有效渠道");
+        }
+        return channel;
+    }
+
+    private void requireChannelAccess(Long channelId, AdminPrincipal principal) {
+        if (principal != null
+                && "CHANNEL".equals(principal.scopeType())
+                && !principal.scopeId().equals(channelId)) {
+            throw new IllegalArgumentException("当前账号不能访问其他渠道数据");
+        }
     }
 
     private Customer required(Long id) {

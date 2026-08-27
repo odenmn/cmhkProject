@@ -58,11 +58,15 @@ CREATE TABLE IF NOT EXISTS admin_user (
     phone VARCHAR(32),
     email VARCHAR(128),
     role_code VARCHAR(32) NOT NULL DEFAULT 'ADMIN',
+    scope_type VARCHAR(16) NOT NULL DEFAULT 'ALL'
+        COMMENT '数据范围：ALL、CMHK、CHANNEL',
+    scope_id BIGINT COMMENT 'CHANNEL范围对应channel.id，其他范围为空',
     status VARCHAR(16) NOT NULL DEFAULT 'ENABLED',
     last_login_at DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_admin_user_status (status)
+    INDEX idx_admin_user_status (status),
+    INDEX idx_admin_user_role_scope (role_code, scope_type, scope_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO mobile_plan (
@@ -236,12 +240,24 @@ CREATE TABLE IF NOT EXISTS channel (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     channel_code VARCHAR(64) NOT NULL UNIQUE,
     channel_name VARCHAR(128) NOT NULL,
+    channel_type VARCHAR(32) NOT NULL DEFAULT 'ORGANIZATION'
+        COMMENT '渠道类型：RESOURCE、ORGANIZATION、ENTERPRISE、SALES_AGENT',
+    parent_channel_id BIGINT,
+    contact_name VARCHAR(64),
+    contact_phone VARCHAR(32),
+    cooperation_status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE'
+        COMMENT '合作状态：PENDING、ACTIVE、SUSPENDED、ENDED',
+    settlement_info VARCHAR(512),
+    owner_user_id BIGINT,
     elderly_mode TINYINT NOT NULL DEFAULT 0,
     wechat_service_url VARCHAR(512),
     wechat_qr_code_url VARCHAR(512),
     enabled TINYINT NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_channel_parent_id (parent_channel_id),
+    INDEX idx_channel_owner_user_id (owner_user_id),
+    INDEX idx_channel_cooperation_status (cooperation_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS channel_entry (
@@ -280,7 +296,7 @@ CREATE TABLE IF NOT EXISTS customer_channel_binding (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     customer_id BIGINT NOT NULL UNIQUE,
     channel_id BIGINT NOT NULL,
-    entry_id BIGINT NOT NULL,
+    entry_id BIGINT,
     bound_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_customer_channel_binding_channel_id (channel_id),
@@ -480,6 +496,35 @@ CREATE TABLE IF NOT EXISTS operation_log (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_operation_log_object (object_type, object_id),
     INDEX idx_operation_log_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS channel_legacy_mapping (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    legacy_table VARCHAR(64) NOT NULL,
+    legacy_id BIGINT NOT NULL,
+    legacy_channel_code VARCHAR(64) NOT NULL,
+    channel_id BIGINT,
+    migration_status VARCHAR(16) NOT NULL,
+    conflict_reason VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_channel_legacy_source (legacy_table, legacy_id),
+    INDEX idx_channel_legacy_channel_id (channel_id),
+    INDEX idx_channel_legacy_status (migration_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS channel_migration_exception (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    legacy_table VARCHAR(64) NOT NULL,
+    legacy_id BIGINT NOT NULL,
+    channel_code VARCHAR(64),
+    exception_type VARCHAR(32) NOT NULL,
+    exception_detail VARCHAR(512) NOT NULL,
+    resolution_status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+    resolved_channel_id BIGINT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME,
+    UNIQUE KEY uk_channel_migration_exception (legacy_table, legacy_id, exception_type),
+    INDEX idx_channel_migration_exception_status (resolution_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS customer_backup_import (

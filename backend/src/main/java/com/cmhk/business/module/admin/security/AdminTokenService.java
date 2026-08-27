@@ -39,15 +39,21 @@ public class AdminTokenService {
         long expiresAt = Instant.now()
                 .plus(properties.getAccessTokenTtlHours(), ChronoUnit.HOURS)
                 .getEpochSecond();
+        String scopeId = user.getScopeId() == null ? "" : user.getScopeId().toString();
         String payload = Base64.getUrlEncoder()
                 .withoutPadding()
-                .encodeToString((user.getUsername() + "|" + user.getRoleCode() + "|" + expiresAt)
+                .encodeToString((user.getId()
+                        + "|" + user.getUsername()
+                        + "|" + user.getRoleCode()
+                        + "|" + user.getScopeType()
+                        + "|" + scopeId
+                        + "|" + expiresAt)
                         .getBytes(StandardCharsets.UTF_8));
         return PREFIX + payload + "." + sign(payload);
     }
 
-    /** 验证令牌签名、格式及过期时间，成功时返回管理员账号。 */
-    public Optional<String> verify(String token) {
+    /** 验证令牌签名、时效和数据库最新用户状态，成功时返回可信身份。 */
+    public Optional<AdminPrincipal> verify(String token) {
         if (token == null || !token.startsWith(PREFIX) || isBlank(properties.getTokenSecret())) {
             return Optional.empty();
         }
@@ -59,15 +65,27 @@ public class AdminTokenService {
 
         try {
             String[] payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8)
-                    .split("\\|", 3);
-            if (payload.length != 3 || !"ADMIN".equals(payload[1])
-                    || Long.parseLong(payload[2]) < Instant.now().getEpochSecond()) {
+                    .split("\\|", -1);
+            if (payload.length != 6 || Long.parseLong(payload[5]) < Instant.now().getEpochSecond()) {
                 return Optional.empty();
             }
-            return Optional.of(payload[0]);
+            Long userId = Long.parseLong(payload[0]);
+            Optional<AdminPrincipal> current = adminUserService.findActivePrincipal(userId);
+            if (current.isEmpty() || !sameClaims(current.get(), payload)) {
+                return Optional.empty();
+            }
+            return current;
         } catch (RuntimeException exception) {
             return Optional.empty();
         }
+    }
+
+    private boolean sameClaims(AdminPrincipal principal, String[] payload) {
+        String scopeId = principal.scopeId() == null ? "" : principal.scopeId().toString();
+        return principal.username().equals(payload[1])
+                && principal.roleCode().equals(payload[2])
+                && principal.scopeType().equals(payload[3])
+                && scopeId.equals(payload[4]);
     }
 
     /** 使用 HMAC-SHA256 为令牌负载签名。 */

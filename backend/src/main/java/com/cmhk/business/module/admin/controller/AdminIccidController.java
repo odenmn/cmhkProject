@@ -4,6 +4,7 @@ import com.cmhk.business.common.ApiResponse;
 import com.cmhk.business.config.AdminAuthInterceptor;
 import com.cmhk.business.module.admin.entity.IccidAssignmentHistory;
 import com.cmhk.business.module.admin.entity.IccidInventory;
+import com.cmhk.business.module.admin.security.AdminPrincipal;
 import com.cmhk.business.module.admin.service.AdminIccidService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,15 +35,15 @@ public class AdminIccidController {
         this.service = service;
     }
 
-    /** 查询卡池，并可按卡号、批次、状态、客户和订单筛选。 */
+    /** 查询卡池，并可按卡号、批次、状态、上台号码和订单筛选。 */
     @GetMapping
     public ApiResponse<List<Map<String, Object>>> list(
             @RequestParam(required = false) String iccid,
             @RequestParam(required = false) String batch,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String serviceNumber,
             @RequestParam(required = false) String orderNo) {
-        List<Map<String, Object>> rows = service.list(iccid, batch, status, phone, orderNo);
+        List<Map<String, Object>> rows = service.list(iccid, batch, status, serviceNumber, orderNo);
         log.info("管理端查询 ICCID 完成，数量={}", rows.size());
         return ApiResponse.success(rows);
     }
@@ -51,8 +52,8 @@ public class AdminIccidController {
     @PostMapping
     public ApiResponse<IccidInventory> create(
             @RequestBody CreateRequest request,
-            @RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator) {
-        return ApiResponse.success(service.create(request.iccid(), request.batchNo(), request.remark(), operator));
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        return ApiResponse.success(service.create(request.iccid(), request.batchNo(), request.remark(), principal.username()));
     }
 
     /** 批量导入 ICCID 文件。 */
@@ -60,8 +61,8 @@ public class AdminIccidController {
     public ApiResponse<Map<String, Integer>> importFile(
             @RequestParam MultipartFile file,
             @RequestParam(required = false) String batchNo,
-            @RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator) {
-        return ApiResponse.success(service.importFile(file, batchNo, operator));
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        return ApiResponse.success(service.importFile(file, batchNo, principal.username()));
     }
 
     /** 将可用卡分配给指定客户及其订单。 */
@@ -69,9 +70,9 @@ public class AdminIccidController {
     public ApiResponse<IccidInventory> assign(
             @PathVariable Long id,
             @RequestBody AssignRequest request,
-            @RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator) {
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
         return ApiResponse.success(service.assign(
-                id, request.customerId(), request.orderId(), request.reason(), operator));
+                id, request.customerId(), request.orderId(), request.reason(), principal.username()));
     }
 
     /** 解除已占用 ICCID 的客户和订单绑定。 */
@@ -79,16 +80,16 @@ public class AdminIccidController {
     public ApiResponse<IccidInventory> unassign(
             @PathVariable Long id,
             @RequestBody ReasonRequest request,
-            @RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator) {
-        return ApiResponse.success(service.unassign(id, request.reason(), operator));
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        return ApiResponse.success(service.unassign(id, request.reason(), principal.username()));
     }
 
     /** 将已占用卡标记为实际使用。 */
     @PostMapping("/{id}/used")
     public ApiResponse<IccidInventory> used(
             @PathVariable Long id,
-            @RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator) {
-        return ApiResponse.success(service.markUsed(id, operator));
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        return ApiResponse.success(service.markUsed(id, principal.username()));
     }
 
     /** 停用尚未分配的异常或失效 ICCID。 */
@@ -96,8 +97,8 @@ public class AdminIccidController {
     public ApiResponse<IccidInventory> disable(
             @PathVariable Long id,
             @RequestBody ReasonRequest request,
-            @RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator) {
-        return ApiResponse.success(service.disable(id, request.reason(), operator));
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        return ApiResponse.success(service.disable(id, request.reason(), principal.username()));
     }
 
     /** 查看单张 ICCID 的分配与状态变更历史。 */

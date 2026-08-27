@@ -10,4 +10,10 @@ public interface CustomerBackupSchemaService {
 
     /** 将旧客户类型摘要和文本状态迁移到独立字段及数字状态码。 */
     Map<String, Integer> normalizeCustomerModel();
+
+    /** 只读预览不符合当前上台口径的历史模拟订单。 */
+    Map<String, Integer> previewOrderScope();
+
+    /** 确认清理未上台客户的历史模拟订单，并保留客户和可用 ICCID。 */
+    Map<String, Integer> confirmOrderScope(String operator);
 }

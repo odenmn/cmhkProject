@@ -47,4 +47,15 @@ public final class CustomerStatusCode {
         }
         return FOLLOWING;
     }
+
+    /**
+     * 判断客户是否已经上台。
+     *
+     * <p>只有待激活、已激活、已完成三个状态可以进入订单表并绑定已使用的 ICCID。</p>
+     */
+    public static boolean isOnboarded(int status) {
+        return status == WAITING_ACTIVATION
+                || status == ACTIVATED
+                || status == COMPLETED;
+    }
 }

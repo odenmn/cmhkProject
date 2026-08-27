@@ -10,8 +10,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 /** 管理端登录入口。 */
 @RestController
 @RequestMapping("/api/admin/auth")
@@ -28,12 +26,29 @@ public class AdminAuthController {
 
     /** 校验管理员账号密码，并返回后续管理接口所需令牌。 */
     @PostMapping("/login")
-    public ApiResponse<Map<String, String>> login(@Valid @RequestBody LoginRequest request) {
+    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         String token = tokenService.login(request.username(), request.password());
+        AdminPrincipal principal = tokenService.verify(token)
+                .orElseThrow(() -> new IllegalArgumentException("管理员登录状态初始化失败"));
         log.info("管理员登录成功，username={}", request.username());
-        return ApiResponse.success(Map.of("token", token, "username", request.username(), "role", "ADMIN"));
+        return ApiResponse.success(new LoginResponse(
+                token,
+                principal.userId(),
+                principal.username(),
+                principal.roleCode(),
+                principal.scopeType(),
+                principal.scopeId()));
     }
 
     /** 管理员登录请求参数。 */
     public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
+
+    /** 管理端保存的登录身份，不包含密码或签名密钥。 */
+    public record LoginResponse(
+            String token,
+            Long userId,
+            String username,
+            String role,
+            String scopeType,
+            Long scopeId) {}
 }

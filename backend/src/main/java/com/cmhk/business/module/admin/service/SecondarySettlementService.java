@@ -1,38 +1,37 @@
 package com.cmhk.business.module.admin.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cmhk.business.common.cache.CacheClient;
-import com.cmhk.business.module.admin.entity.*;
-import com.cmhk.business.module.admin.mapper.*;
-import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
-import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import com.cmhk.business.module.admin.entity.SecondaryChannel;
+import com.cmhk.business.module.admin.entity.SecondaryCommissionRecord;
+import com.cmhk.business.module.admin.entity.SecondaryCommissionRule;
+import com.cmhk.business.module.admin.security.AdminPrincipal;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
-@Service
-public class SecondarySettlementService {
-    private static final BigDecimal ZERO=BigDecimal.ZERO.setScale(2,RoundingMode.HALF_UP);
-    private final SecondaryChannelMapper channelMapper;private final SecondaryCommissionRuleMapper ruleMapper;private final SecondaryCommissionRecordMapper recordMapper;private final MobilePlanOrderMapper orderMapper;private final OperationLogService logService;private final ObjectMapper objectMapper;private final CacheClient cacheClient;
-    public SecondarySettlementService(SecondaryChannelMapper channelMapper,SecondaryCommissionRuleMapper ruleMapper,SecondaryCommissionRecordMapper recordMapper,MobilePlanOrderMapper orderMapper,OperationLogService logService,ObjectMapper objectMapper,CacheClient cacheClient){this.channelMapper=channelMapper;this.ruleMapper=ruleMapper;this.recordMapper=recordMapper;this.orderMapper=orderMapper;this.logService=logService;this.objectMapper=objectMapper;this.cacheClient=cacheClient;}
-    public List<SecondaryChannel> channels(){return channelMapper.selectList(new LambdaQueryWrapper<SecondaryChannel>().orderByDesc(SecondaryChannel::getId));}
-    @Transactional public SecondaryChannel saveChannel(Long id,SecondaryChannel input,String op){SecondaryChannel before=id==null?null:channel(id);input.setId(id);if(input.getStatus()==null)input.setStatus("ENABLED");if(id==null)channelMapper.insert(input);else channelMapper.updateById(input);logService.record(op,id==null?"SECONDARY_CHANNEL_CREATE":"SECONDARY_CHANNEL_UPDATE","SECONDARY_CHANNEL",input.getId(),before,input,null);return input;}
-    public List<SecondaryCommissionRule> rules(){return ruleMapper.selectList(new LambdaQueryWrapper<SecondaryCommissionRule>().orderByDesc(SecondaryCommissionRule::getId));}
-    @Transactional public SecondaryCommissionRule saveRule(Long id,SecondaryCommissionRule input,String op){SecondaryCommissionRule before=id==null?null:rule(id);validateRule(input);input.setId(id);if(input.getEnabled()==null)input.setEnabled(1);if(id==null)ruleMapper.insert(input);else ruleMapper.updateById(input);logService.record(op,id==null?"COMMISSION_RULE_CREATE":"COMMISSION_RULE_UPDATE","COMMISSION_RULE",input.getId(),before,input,null);return input;}
-    public List<SecondaryCommissionRecord> records(){return recordMapper.selectList(new LambdaQueryWrapper<SecondaryCommissionRecord>().orderByDesc(SecondaryCommissionRecord::getId));}
+/** 统一渠道佣金计算和旧渠道只读兼容服务。 */
+public interface SecondarySettlementService {
 
-    @Transactional public SecondaryCommissionRecord calculate(CalculateRequest request,String op){MobilePlanOrder order=orderMapper.selectById(request.orderId());SecondaryChannel channel=channel(request.channelId());SecondaryCommissionRule rule=rule(request.ruleId());if(order==null)throw new IllegalArgumentException("订单不存在");if(recordMapper.selectCount(new LambdaQueryWrapper<SecondaryCommissionRecord>().eq(SecondaryCommissionRecord::getOrderId,request.orderId()))>0)throw new IllegalArgumentException("该订单已经生成结算记录");if(!isActivated(order))throw new IllegalArgumentException("订单尚未激活，不能生成渠道结算");if(!"已对账".equals(order.getReconciliationStatus()))throw new IllegalArgumentException("订单尚未完成甲方对账");
-        BigDecimal fee=money(rule.getMonthlyFee());BigDecimal main=fee.multiply(n(rule.getMainMultiplier()));BigDecimal extra=fee.multiply(n(rule.getExtraMultiplier()));BigDecimal promo=request.promotionApplied()?fee.multiply(n(rule.getPromotionMultiplier())):BigDecimal.ZERO;BigDecimal total=main.add(extra).add(promo);BigDecimal gross=fee.multiply(n(rule.getChannelMultiplier()));BigDecimal channelSubsidy=request.channelSubsidy()==null?money(rule.getDefaultChannelSubsidy()):money(request.channelSubsidy());BigDecimal joincomSubsidy=request.joincomSubsidy()==null?money(rule.getDefaultJoincomSubsidy()):money(request.joincomSubsidy());BigDecimal payable=gross.subtract(channelSubsidy);BigDecimal retained=total.subtract(gross).subtract(joincomSubsidy);
-        BigDecimal t1=main.min(fee);BigDecimal cap=fee.multiply(BigDecimal.valueOf(rule.getContractMonths()!=null&&rule.getContractMonths()==12?2.5:3));BigDecimal t3=main.subtract(t1).max(BigDecimal.ZERO).min(cap).add(promo);BigDecimal t7=main.subtract(t1).subtract(t3.subtract(promo)).max(BigDecimal.ZERO).add(extra);
-        SecondaryCommissionRecord record=new SecondaryCommissionRecord();record.setOrderId(order.getId());record.setChannelId(channel.getId());record.setRuleId(rule.getId());record.setPromotionApplied(request.promotionApplied()?1:0);record.setJoincomTotal(money(total));record.setChannelGross(money(gross));record.setChannelSubsidy(channelSubsidy);record.setJoincomSubsidy(joincomSubsidy);record.setChannelPayable(money(payable));record.setJoincomRetained(money(retained));record.setT1Amount(money(t1));record.setT3Amount(money(t3));record.setT7Amount(money(t7));record.setAdjustmentAmount(ZERO);record.setFinalAmount(money(payable));record.setStatus("PENDING");try{record.setRuleSnapshot(objectMapper.writeValueAsString(rule));}catch(Exception e){throw new IllegalStateException("规则快照保存失败");}recordMapper.insert(record);logService.record(op,"COMMISSION_CALCULATE","COMMISSION_RECORD",record.getId(),null,record,null);invalidateSettlementCaches();return record;}
-    @Transactional public SecondaryCommissionRecord adjust(Long id,BigDecimal amount,String reason,String op){if(reason==null||reason.isBlank())throw new IllegalArgumentException("人工修正必须填写原因");SecondaryCommissionRecord record=record(id);if("CONFIRMED".equals(record.getStatus()))throw new IllegalArgumentException("已确认结算不能修正");BigDecimal before=record.getFinalAmount();record.setAdjustmentAmount(money(amount));record.setAdjustmentReason(reason);record.setFinalAmount(money(record.getChannelPayable().add(record.getAdjustmentAmount())));recordMapper.updateById(record);logService.record(op,"COMMISSION_ADJUST","COMMISSION_RECORD",id,before,record.getFinalAmount(),reason);invalidateSettlementCaches();return record;}
-    @Transactional public SecondaryCommissionRecord confirm(Long id,String op){SecondaryCommissionRecord record=record(id);if("CONFIRMED".equals(record.getStatus()))throw new IllegalArgumentException("结算记录已经确认");String beforeStatus=record.getStatus();record.setStatus("CONFIRMED");record.setConfirmedBy(op);record.setConfirmedAt(java.time.LocalDateTime.now());recordMapper.updateById(record);logService.record(op,"COMMISSION_CONFIRM","COMMISSION_RECORD",id,beforeStatus,record.getStatus(),"仅确认业务结算，不触发自动打款");invalidateSettlementCaches();return record;}
-    private void invalidateSettlementCaches(){cacheClient.invalidateNamespacesAfterCommit(AdminCacheKeys.DASHBOARD,AdminCacheKeys.CUSTOMERS);}
-    private SecondaryChannel channel(Long id){SecondaryChannel v=channelMapper.selectById(id);if(v==null)throw new IllegalArgumentException("二级渠道不存在");return v;}private SecondaryCommissionRule rule(Long id){SecondaryCommissionRule v=ruleMapper.selectById(id);if(v==null)throw new IllegalArgumentException("佣金规则不存在");return v;}private SecondaryCommissionRecord record(Long id){SecondaryCommissionRecord v=recordMapper.selectById(id);if(v==null)throw new IllegalArgumentException("结算记录不存在");return v;}
-    private void validateRule(SecondaryCommissionRule r){if(r.getRuleName()==null||r.getRuleName().isBlank())throw new IllegalArgumentException("规则名称不能为空");if(r.getMonthlyFee()==null||r.getMonthlyFee().signum()<0)throw new IllegalArgumentException("月费必须大于等于0");}private boolean isActivated(MobilePlanOrder o){return (o.getActivationStatus()!=null&&o.getActivationStatus().contains("激活"))||"已激活".equals(o.getStatus());}private BigDecimal n(BigDecimal v){return v==null?BigDecimal.ZERO:v;}private BigDecimal money(BigDecimal v){return n(v).setScale(2,RoundingMode.HALF_UP);}
-    public record CalculateRequest(Long orderId,Long channelId,Long ruleId,boolean promotionApplied,BigDecimal channelSubsidy,BigDecimal joincomSubsidy){}
+    List<SecondaryChannel> channels();
+
+    SecondaryChannel saveChannel(Long id, SecondaryChannel input, String operator);
+
+    List<SecondaryCommissionRule> rules();
+
+    SecondaryCommissionRule saveRule(Long id, SecondaryCommissionRule input, AdminPrincipal principal);
+
+    List<SecondaryCommissionRecord> records(AdminPrincipal principal);
+
+    SecondaryCommissionRecord calculate(CalculateRequest request, AdminPrincipal principal);
+
+    SecondaryCommissionRecord adjust(Long id, BigDecimal amount, String reason, AdminPrincipal principal);
+
+    SecondaryCommissionRecord confirm(Long id, AdminPrincipal principal);
+
+    record CalculateRequest(
+            Long orderId,
+            Long channelId,
+            Long ruleId,
+            boolean promotionApplied,
+            BigDecimal channelSubsidy,
+            BigDecimal joincomSubsidy) {}
 }

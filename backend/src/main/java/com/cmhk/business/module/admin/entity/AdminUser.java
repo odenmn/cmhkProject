@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import java.time.LocalDateTime;
 
+/** JOINCOM管理后台内部用户。 */
 @Data
 @TableName("admin_user")
 public class AdminUser {
@@ -18,6 +19,8 @@ public class AdminUser {
     private String phone;
     private String email;
     private String roleCode;
+    private String scopeType;
+    private Long scopeId;
     private String status;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;

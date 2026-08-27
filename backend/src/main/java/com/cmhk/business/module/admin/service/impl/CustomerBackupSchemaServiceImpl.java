@@ -1,8 +1,12 @@
 package com.cmhk.business.module.admin.service.impl;
 
+import com.cmhk.business.common.cache.CacheClient;
+import com.cmhk.business.module.admin.service.AdminCacheKeys;
+import com.cmhk.business.module.admin.service.OperationLogService;
 import com.cmhk.business.module.admin.service.CustomerBackupSchemaService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,10 +15,19 @@ import java.util.Map;
 @Service
 public class CustomerBackupSchemaServiceImpl implements CustomerBackupSchemaService {
 
-    private final JdbcTemplate jdbcTemplate;
+    private static final String BACKUP_SOURCE = "CMHK_BACKUP";
 
-    public CustomerBackupSchemaServiceImpl(JdbcTemplate jdbcTemplate) {
+    private final JdbcTemplate jdbcTemplate;
+    private final OperationLogService operationLogService;
+    private final CacheClient cacheClient;
+
+    public CustomerBackupSchemaServiceImpl(
+            JdbcTemplate jdbcTemplate,
+            OperationLogService operationLogService,
+            CacheClient cacheClient) {
         this.jdbcTemplate = jdbcTemplate;
+        this.operationLogService = operationLogService;
+        this.cacheClient = cacheClient;
     }
 
     /** 仅执行幂等 DDL，不读取或改写客户业务数据。 */
@@ -69,6 +82,64 @@ public class CustomerBackupSchemaServiceImpl implements CustomerBackupSchemaServ
         result.put("activatedCustomers", count("SELECT COUNT(*) FROM customer WHERE source_system = 'CMHK_BACKUP' AND current_status = 5"));
         result.put("legacyOnboardActivationStatuses", count("SELECT COUNT(*) FROM mobile_plan_order WHERE order_source = 'CMHK_BACKUP' AND activation_status = '已上台'"));
         return result;
+    }
+
+    /** 只读统计当前不应保留在订单表中的历史模拟订单及关联风险。 */
+    @Override
+    public Map<String, Integer> previewOrderScope() {
+        Map<String, Integer> result = new LinkedHashMap<>();
+        result.put("backupCustomers", count("SELECT COUNT(*) FROM customer WHERE source_system = 'CMHK_BACKUP'"));
+        result.put("onboardedCustomers", count("SELECT COUNT(*) FROM customer WHERE source_system = 'CMHK_BACKUP' AND current_status IN (4, 5, 6)"));
+        result.put("currentBackupOrders", count("SELECT COUNT(*) FROM mobile_plan_order WHERE order_source = 'CMHK_BACKUP'"));
+        result.put("ordersToRemove", count(outOfScopeOrderCountSql()));
+        result.put("iccidBindingConflicts", count("SELECT COUNT(*) FROM iccid_inventory i JOIN mobile_plan_order o ON i.current_order_id = o.id JOIN customer c ON o.customer_id = c.id WHERE o.order_source = 'CMHK_BACKUP' AND c.source_system = 'CMHK_BACKUP' AND c.current_status NOT IN (4, 5, 6)"));
+        result.put("reconciliationConflicts", count("SELECT COUNT(*) FROM cmhk_reconciliation_row r JOIN mobile_plan_order o ON r.matched_order_id = o.id JOIN customer c ON o.customer_id = c.id WHERE o.order_source = 'CMHK_BACKUP' AND c.source_system = 'CMHK_BACKUP' AND c.current_status NOT IN (4, 5, 6)"));
+        result.put("settlementConflicts", count("SELECT COUNT(*) FROM secondary_commission_record s JOIN mobile_plan_order o ON s.order_id = o.id JOIN customer c ON o.customer_id = c.id WHERE o.order_source = 'CMHK_BACKUP' AND c.source_system = 'CMHK_BACKUP' AND c.current_status NOT IN (4, 5, 6)"));
+        return result;
+    }
+
+    /**
+     * 确认清理不符合上台状态口径的历史模拟订单。
+     *
+     * <p>存在 ICCID、对账或结算关联时拒绝执行，避免自动破坏历史关系。</p>
+     */
+    @Override
+    @Transactional
+    public synchronized Map<String, Integer> confirmOrderScope(String operator) {
+        Map<String, Integer> result = previewOrderScope();
+        int relatedRecords = result.get("iccidBindingConflicts")
+                + result.get("reconciliationConflicts")
+                + result.get("settlementConflicts");
+        if (relatedRecords > 0) {
+            throw new IllegalStateException("存在已关联的 ICCID、对账或结算记录，不能自动清理历史订单");
+        }
+
+        int importRowsCleared = jdbcTemplate.update("UPDATE customer_backup_import_row r JOIN mobile_plan_order o ON r.order_id = o.id JOIN customer c ON o.customer_id = c.id SET r.order_id = NULL WHERE o.order_source = 'CMHK_BACKUP' AND c.source_system = 'CMHK_BACKUP' AND c.current_status NOT IN (4, 5, 6)");
+        int ordersRemoved = jdbcTemplate.update("DELETE o FROM mobile_plan_order o JOIN customer c ON o.customer_id = c.id WHERE o.order_source = 'CMHK_BACKUP' AND c.source_system = 'CMHK_BACKUP' AND c.current_status NOT IN (4, 5, 6)");
+        result.put("importRowsCleared", importRowsCleared);
+        result.put("ordersRemoved", ordersRemoved);
+        operationLogService.record(
+                operator,
+                "CUSTOMER_BACKUP_ORDER_SCOPE_CORRECT",
+                "CUSTOMER_BACKUP",
+                null,
+                null,
+                result,
+                "仅保留状态为待激活、已激活、已完成的模拟订单"
+        );
+        cacheClient.invalidateNamespacesAfterCommit(
+                AdminCacheKeys.CUSTOMERS,
+                AdminCacheKeys.ORDERS,
+                AdminCacheKeys.ICCIDS,
+                AdminCacheKeys.DASHBOARD
+        );
+        return result;
+    }
+
+    private String outOfScopeOrderCountSql() {
+        return "SELECT COUNT(*) FROM mobile_plan_order o JOIN customer c ON o.customer_id = c.id "
+                + "WHERE o.order_source = 'CMHK_BACKUP' AND c.source_system = 'CMHK_BACKUP' "
+                + "AND c.current_status NOT IN (4, 5, 6)";
     }
 
     private boolean isNumericCustomerStatus() {

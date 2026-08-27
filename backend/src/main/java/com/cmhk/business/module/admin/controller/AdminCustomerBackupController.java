@@ -3,16 +3,18 @@ package com.cmhk.business.module.admin.controller;
 import com.cmhk.business.common.ApiResponse;
 import com.cmhk.business.module.admin.dto.CustomerBackupSimulationPreview;
 import com.cmhk.business.module.admin.dto.CustomerBackupImportResult;
+import com.cmhk.business.module.admin.security.AdminPrincipal;
 import com.cmhk.business.module.admin.service.CustomerBackupImportService;
 import com.cmhk.business.module.admin.service.CustomerBackupSchemaService;
 import com.cmhk.business.module.admin.service.CustomerBackupSimulationService;
 import com.cmhk.business.config.AdminAuthInterceptor;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -64,10 +66,9 @@ public class AdminCustomerBackupController {
     public ApiResponse<CustomerBackupImportResult> confirm(
             @RequestParam("file") MultipartFile file,
             @RequestParam("previewHash") String previewHash,
-            HttpServletRequest request) {
-        String operator = (String) request.getAttribute(AdminAuthInterceptor.ADMIN_USERNAME);
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
         schemaService.ensureReady();
-        CustomerBackupImportResult result = importService.confirm(file, previewHash, operator);
+        CustomerBackupImportResult result = importService.confirm(file, previewHash, principal.username());
         log.info(
                 "CMHK 客户备份确认完成，批次={}，客户={}，订单={}，ICCID={}，异常={}",
                 result.importId(),
@@ -90,6 +91,30 @@ public class AdminCustomerBackupController {
                 result.get("occupiedRequirementSummaries"),
                 result.get("onboardedCustomers")
         );
+        return ApiResponse.success(result);
+    }
+
+    /** 预览当前上台状态口径下需要清理的历史模拟订单。 */
+    @GetMapping("/order-scope/preview")
+    public ApiResponse<Map<String, Integer>> previewOrderScope() {
+        Map<String, Integer> result = schemaService.previewOrderScope();
+        log.info(
+                "历史模拟订单范围预览完成，当前订单={}，待清理={}，关联冲突={}",
+                result.get("currentBackupOrders"),
+                result.get("ordersToRemove"),
+                result.get("iccidBindingConflicts")
+                        + result.get("reconciliationConflicts")
+                        + result.get("settlementConflicts")
+        );
+        return ApiResponse.success(result);
+    }
+
+    /** 确认清理未上台客户的历史模拟订单，客户和可用 ICCID 不受影响。 */
+    @PostMapping("/order-scope/confirm")
+    public ApiResponse<Map<String, Integer>> confirmOrderScope(
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        Map<String, Integer> result = schemaService.confirmOrderScope(principal.username());
+        log.info("历史模拟订单范围修正完成，已清理订单={}", result.get("ordersRemoved"));
         return ApiResponse.success(result);
     }
 }

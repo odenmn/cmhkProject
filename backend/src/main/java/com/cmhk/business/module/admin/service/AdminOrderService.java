@@ -2,6 +2,8 @@ package com.cmhk.business.module.admin.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cmhk.business.common.cache.CacheClient;
+import com.cmhk.business.module.admin.security.AdminPrincipal;
+import com.cmhk.business.module.customer.entity.Customer;
 import com.cmhk.business.module.customer.mapper.CustomerMapper;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
@@ -22,6 +24,37 @@ public class AdminOrderService {
     public List<MobilePlanOrder> list(String keyword, String status, Long customerId) {
         String key=cacheClient.versionedKey(AdminCacheKeys.ORDERS,"list:"+AdminCacheKeys.discriminator(keyword,status,customerId));
         return cacheClient.queryWithMutex(key,orderListType,()->listFromDatabase(keyword,status,customerId),CACHE_TTL,EMPTY_CACHE_TTL);
+    }
+
+    public List<MobilePlanOrder> list(
+            String keyword,
+            String status,
+            Long customerId,
+            AdminPrincipal principal) {
+        if (principal == null || !"CHANNEL".equals(principal.scopeType())) {
+            return list(keyword, status, customerId);
+        }
+        List<Long> customerIds = customerMapper.selectList(new LambdaQueryWrapper<Customer>()
+                        .eq(Customer::getChannelId, principal.scopeId()))
+                .stream()
+                .map(Customer::getId)
+                .toList();
+        if (customerIds.isEmpty() || (customerId != null && !customerIds.contains(customerId))) {
+            return List.of();
+        }
+        return mapper.selectList(new LambdaQueryWrapper<MobilePlanOrder>()
+                .and(keyword != null && !keyword.isBlank(), query -> query
+                        .like(MobilePlanOrder::getOrderNo, keyword)
+                        .or()
+                        .like(MobilePlanOrder::getUmallOrderNo, keyword)
+                        .or()
+                        .like(MobilePlanOrder::getContactPhone, keyword)
+                        .or()
+                        .like(MobilePlanOrder::getServiceNumber, keyword))
+                .eq(status != null && !status.isBlank(), MobilePlanOrder::getStatus, status)
+                .eq(customerId != null, MobilePlanOrder::getCustomerId, customerId)
+                .in(customerId == null, MobilePlanOrder::getCustomerId, customerIds)
+                .orderByDesc(MobilePlanOrder::getId));
     }
 
     private List<MobilePlanOrder> listFromDatabase(String keyword, String status, Long customerId) {
@@ -46,7 +79,33 @@ public class AdminOrderService {
         cacheClient.invalidateNamespacesAfterCommit(AdminCacheKeys.ORDERS,AdminCacheKeys.CUSTOMERS,AdminCacheKeys.ICCIDS,AdminCacheKeys.DASHBOARD);
         return target;
     }
+    @Transactional
+    public MobilePlanOrder save(Long id, MobilePlanOrder input, AdminPrincipal principal) {
+        requireCustomerAccess(input.getCustomerId(), principal);
+        if (id != null) {
+            requireCustomerAccess(required(id).getCustomerId(), principal);
+        }
+        return save(id, input, principal.username());
+    }
+
     public MobilePlanOrder detail(Long id){String key=cacheClient.versionedKey(AdminCacheKeys.ORDERS,"detail:"+id);return cacheClient.queryWithMutex(key,orderType,()->required(id),CACHE_TTL,EMPTY_CACHE_TTL);}
+    public MobilePlanOrder detail(Long id, AdminPrincipal principal) {
+        MobilePlanOrder order = detail(id);
+        requireCustomerAccess(order.getCustomerId(), principal);
+        return order;
+    }
+
+    private void requireCustomerAccess(Long customerId, AdminPrincipal principal) {
+        Customer customer = customerId == null ? null : customerMapper.selectById(customerId);
+        if (customer == null) {
+            throw new IllegalArgumentException("请选择有效客户");
+        }
+        if (principal != null
+                && "CHANNEL".equals(principal.scopeType())
+                && !principal.scopeId().equals(customer.getChannelId())) {
+            throw new IllegalArgumentException("当前账号不能访问其他渠道订单");
+        }
+    }
     public MobilePlanOrder required(Long id){MobilePlanOrder o=mapper.selectById(id);if(o==null)throw new IllegalArgumentException("订单不存在");return o;}
     private String required(String v,String m){if(v==null||v.isBlank())throw new IllegalArgumentException(m);return v.trim();}
 }

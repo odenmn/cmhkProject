@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/** JOINCOM统一渠道主档。 */
 @Data
 @TableName("channel")
 public class Channel {
@@ -14,6 +15,13 @@ public class Channel {
     private Long id;
     private String channelCode;
     private String channelName;
+    private String channelType;
+    private Long parentChannelId;
+    private String contactName;
+    private String contactPhone;
+    private String cooperationStatus;
+    private String settlementInfo;
+    private Long ownerUserId;
     private Integer elderlyMode;
     private String wechatServiceUrl;
     private String wechatQrCodeUrl;

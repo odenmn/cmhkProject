@@ -118,6 +118,12 @@ public class CustomerChannelAuthServiceImpl implements CustomerChannelAuthServic
             }
         }
 
+        // 绑定表是客户渠道归属的业务事实，客户主表只保存同步后的冗余渠道ID。
+        if (!boundChannel.getId().equals(customer.getChannelId())) {
+            customer.setChannelId(boundChannel.getId());
+            customerMapper.updateById(customer);
+        }
+
         AccessTokenService.IssuedAccessToken token = accessTokenService.issue(customer.getId());
         return new PhoneLoginResponse(customer.getId(), newCustomer, boundChannel.getChannelName(),
                 boundChannel.getElderlyMode(), token.value(), token.expiresAt().toString());

@@ -39,7 +39,7 @@ class CustomerBackupSimulationServiceTests {
 
         assertEquals(6, preview.summary().totalRecords());
         assertEquals(6, preview.summary().customerCandidates());
-        assertEquals(6, preview.summary().orderCandidates());
+        assertEquals(5, preview.summary().orderCandidates());
         assertEquals(5, preview.summary().onboardedRecords());
         assertEquals(3, preview.summary().validRealIccidRows());
         assertEquals(1, preview.summary().realIccidCandidates());
@@ -50,6 +50,7 @@ class CustomerBackupSimulationServiceTests {
         assertEquals(CustomerStatusCode.ACTIVATED, preview.customers().get(0).currentStatus());
         assertEquals(CustomerStatusCode.FOLLOWING, preview.customers().get(2).currentStatus());
         assertEquals(CustomerStatusCode.WAITING_ACTIVATION, preview.customers().get(3).currentStatus());
+        assertTrue(preview.orders().stream().noneMatch(order -> "SRC003".equals(order.sourceId())));
 
         CustomerBackupSimulationPreview.IccidCandidate virtualCard = preview.iccids().stream()
                 .filter(candidate -> "VIRTUAL".equals(candidate.cardType()))
@@ -72,6 +73,10 @@ class CustomerBackupSimulationServiceTests {
                 CustomerStatusCode.fromBackup("待激活", true));
         assertEquals(CustomerStatusCode.COMPLETED,
                 CustomerStatusCode.fromBackup("已完成", false));
+        assertTrue(CustomerStatusCode.isOnboarded(CustomerStatusCode.WAITING_ACTIVATION));
+        assertTrue(CustomerStatusCode.isOnboarded(CustomerStatusCode.ACTIVATED));
+        assertTrue(CustomerStatusCode.isOnboarded(CustomerStatusCode.COMPLETED));
+        assertTrue(!CustomerStatusCode.isOnboarded(CustomerStatusCode.PROCESSING));
     }
 
     /** 相同上台号码和上台日期必须稳定生成相同虚拟 ICCID。 */
@@ -114,7 +119,7 @@ class CustomerBackupSimulationServiceTests {
 
         assertEquals(233, preview.summary().totalRecords());
         assertEquals(233, preview.summary().customerCandidates());
-        assertEquals(233, preview.summary().orderCandidates());
+        assertEquals(132, preview.summary().orderCandidates());
         assertEquals(132, preview.summary().onboardedRecords());
         assertEquals(100, preview.summary().validRealIccidRows());
         assertEquals(98, preview.summary().realIccidCandidates());

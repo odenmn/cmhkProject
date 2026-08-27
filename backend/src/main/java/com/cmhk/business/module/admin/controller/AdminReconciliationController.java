@@ -4,6 +4,7 @@ import com.cmhk.business.common.ApiResponse;
 import com.cmhk.business.config.AdminAuthInterceptor;
 import com.cmhk.business.module.admin.entity.ReconciliationImport;
 import com.cmhk.business.module.admin.entity.ReconciliationRow;
+import com.cmhk.business.module.admin.security.AdminPrincipal;
 import com.cmhk.business.module.admin.service.ReconciliationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,8 +39,8 @@ public class AdminReconciliationController {
     @PostMapping("/preview")
     public ApiResponse<Map<String, Object>> preview(
             @RequestParam MultipartFile file,
-            @RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator) {
-        Map<String, Object> result = service.preview(file, operator);
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        Map<String, Object> result = service.preview(file, principal.username());
         log.info("甲方对账文件预览完成");
         return ApiResponse.success(result);
     }
@@ -48,8 +49,8 @@ public class AdminReconciliationController {
     @PostMapping("/{id}/confirm")
     public ApiResponse<ReconciliationImport> confirm(
             @PathVariable Long id,
-            @RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator) {
-        return ApiResponse.success(service.confirm(id, operator));
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        return ApiResponse.success(service.confirm(id, principal.username()));
     }
 
     /** 查询历史导入批次。 */
@@ -75,8 +76,8 @@ public class AdminReconciliationController {
     public ApiResponse<ReconciliationRow> match(
             @PathVariable Long id,
             @RequestBody MatchRequest request,
-            @RequestAttribute(AdminAuthInterceptor.ADMIN_USERNAME) String operator) {
-        return ApiResponse.success(service.manualMatch(id, request.orderId(), operator));
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        return ApiResponse.success(service.manualMatch(id, request.orderId(), principal.username()));
     }
 
     public record MatchRequest(Long orderId) {}

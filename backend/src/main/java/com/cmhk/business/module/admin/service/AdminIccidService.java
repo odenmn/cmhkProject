@@ -9,7 +9,7 @@ import java.util.Map;
 
 /** 管理端 ICCID 查询缓存与写操作门面。 */
 public interface AdminIccidService {
-    List<Map<String, Object>> list(String iccid, String batch, String status, String phone, String orderNo);
+    List<Map<String, Object>> list(String iccid, String batch, String status, String serviceNumber, String orderNo);
 
     IccidInventory create(String iccid, String batch, String remark, String operator);
 

@@ -40,16 +40,19 @@ public class AdminIccidServiceImpl implements AdminIccidService {
             String iccid,
             String batch,
             String status,
-            String phone,
+            String serviceNumber,
             String orderNo) {
         String key = cacheClient.versionedKey(
                 AdminCacheKeys.ICCIDS,
-                "list:" + AdminCacheKeys.discriminator(iccid, batch, status, phone, orderNo)
+                "list:" + AdminCacheKeys.discriminator(iccid, batch, status, serviceNumber, orderNo)
         );
         return cacheClient.queryWithMutex(
                 key,
                 listType,
-                () -> delegate.list(iccid, batch, status, phone, orderNo),
+                () -> filterByServiceNumber(
+                        delegate.list(iccid, batch, status, null, orderNo),
+                        serviceNumber
+                ),
                 CACHE_TTL,
                 EMPTY_CACHE_TTL
         );
@@ -119,5 +122,26 @@ public class AdminIccidServiceImpl implements AdminIccidService {
                 AdminCacheKeys.CUSTOMERS,
                 AdminCacheKeys.DASHBOARD
         );
+    }
+
+    /** 按卡池记录保存的上台号码筛选，不再使用客户手机号。 */
+    private List<Map<String, Object>> filterByServiceNumber(
+            List<Map<String, Object>> rows,
+            String serviceNumber) {
+        if (serviceNumber == null || serviceNumber.isBlank()) {
+            return rows;
+        }
+        return rows.stream()
+                .filter(row -> matchesServiceNumber(row, serviceNumber))
+                .toList();
+    }
+
+    private boolean matchesServiceNumber(Map<String, Object> row, String serviceNumber) {
+        Object inventory = row.get("inventory");
+        if (!(inventory instanceof IccidInventory card)) {
+            return false;
+        }
+        return card.getServiceNumber() != null
+                && card.getServiceNumber().contains(serviceNumber);
     }
 }
