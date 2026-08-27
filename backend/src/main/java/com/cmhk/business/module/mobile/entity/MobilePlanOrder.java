@@ -3,6 +3,7 @@ package com.cmhk.business.module.mobile.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -66,6 +67,10 @@ public class MobilePlanOrder {
 
     private String idType;
 
+    /**
+     * 历史证件号码字段仅保留数据库兼容，不允许通过接口接收或返回。
+     */
+    @JsonIgnore
     private String idNo;
 
     private String referrerPhone;

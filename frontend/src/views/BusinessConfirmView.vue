@@ -14,7 +14,6 @@ const hasOffer = ref(0)
 const hasPassOrHkid = ref(0)
 const expectedStartDate = ref('')
 const idType = ref('HKID')
-const idNo = ref('')
 const referrerPhone = ref('')
 const preferredContactTime = ref('')
 const remark = ref('')
@@ -80,7 +79,6 @@ async function confirmApply() {
       hasPassOrHkid: hasPassOrHkid.value,
       expectedStartDate: expectedStartDate.value || undefined,
       idType: idType.value,
-      idNo: idNo.value,
       referrerPhone: referrerPhone.value,
       preferredContactTime: preferredContactTime.value,
       remark: remark.value
@@ -207,10 +205,6 @@ function goTransfer(orderNo: string) {
           <option value="MAINLAND_ID">内地身份证</option>
           <option value="OTHER">其他证件</option>
         </select>
-      </label>
-      <label class="field-row">
-        <span>证件号码</span>
-        <input v-model="idNo" placeholder="可选，人工办理时用于核对" />
       </label>
       <label class="field-row">
         <span>推荐人号码</span>

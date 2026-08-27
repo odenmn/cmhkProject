@@ -37,8 +37,6 @@ public class MobilePlanOrderCreateRequest {
 
     private String idType;
 
-    private String idNo;
-
     private String referrerPhone;
 
     private String preferredContactTime;

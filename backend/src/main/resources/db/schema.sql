@@ -1,3 +1,4 @@
+-- 仅用于全新安装的最终结构。真实数据库升级必须执行 db/migrations 下的版本化脚本。
 CREATE DATABASE IF NOT EXISTS cmhk
     DEFAULT CHARACTER SET utf8mb4
     DEFAULT COLLATE utf8mb4_unicode_ci;
@@ -24,9 +25,6 @@ ON DUPLICATE KEY UPDATE
     sort_order = VALUES(sort_order),
     enabled = VALUES(enabled);
 
-DELETE FROM business_type
-WHERE code IN ('BROADBAND', 'VALUE_ADDED');
-
 CREATE TABLE IF NOT EXISTS mobile_plan (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     plan_code VARCHAR(64) NOT NULL UNIQUE,
@@ -52,35 +50,6 @@ CREATE TABLE IF NOT EXISTS mobile_plan (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-DROP PROCEDURE IF EXISTS add_column_if_missing;
-
-DELIMITER //
-CREATE PROCEDURE add_column_if_missing(
-    IN target_table VARCHAR(64),
-    IN target_column VARCHAR(64),
-    IN column_definition VARCHAR(512),
-    IN after_column VARCHAR(64)
-)
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_schema = DATABASE()
-          AND table_name = target_table
-          AND column_name = target_column
-    ) THEN
-        SET @ddl = CONCAT(
-            'ALTER TABLE ', target_table,
-            ' ADD COLUMN ', target_column, ' ', column_definition,
-            IF(after_column IS NULL OR after_column = '', '', CONCAT(' AFTER ', after_column))
-        );
-        PREPARE stmt FROM @ddl;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
-    END IF;
-END//
-DELIMITER ;
-
 CREATE TABLE IF NOT EXISTS admin_user (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(64) NOT NULL UNIQUE,
@@ -95,17 +64,6 @@ CREATE TABLE IF NOT EXISTS admin_user (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_admin_user_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CALL add_column_if_missing('mobile_plan', 'plan_type', 'VARCHAR(64) NOT NULL DEFAULT ''移动套餐''', 'plan_name');
-CALL add_column_if_missing('mobile_plan', 'channel_price_text', 'VARCHAR(64) NOT NULL DEFAULT ''''', 'monthly_fee');
-CALL add_column_if_missing('mobile_plan', 'effective_monthly_fee', 'DECIMAL(10, 2) NULL', 'channel_price_text');
-CALL add_column_if_missing('mobile_plan', 'effective_price_text', 'VARCHAR(64) NULL', 'effective_monthly_fee');
-CALL add_column_if_missing('mobile_plan', 'official_monthly_fee', 'DECIMAL(10, 2) NULL', 'effective_price_text');
-CALL add_column_if_missing('mobile_plan', 'official_price_text', 'VARCHAR(64) NULL', 'official_monthly_fee');
-CALL add_column_if_missing('mobile_plan', 'roaming_benefit', 'VARCHAR(128) NULL', 'voice_quota');
-CALL add_column_if_missing('mobile_plan', 'promotion_end_date', 'DATE NULL', 'contract_period');
-CALL add_column_if_missing('mobile_plan', 'source_version', 'VARCHAR(32) NULL', 'promotion_end_date');
-CALL add_column_if_missing('mobile_plan', 'discount_formula', 'VARCHAR(512) NULL', 'source_version');
 
 INSERT INTO mobile_plan (
     plan_code,
@@ -226,12 +184,12 @@ ON DUPLICATE KEY UPDATE
 CREATE TABLE IF NOT EXISTS mobile_plan_order (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_no VARCHAR(64) NOT NULL UNIQUE,
-    customer_id BIGINT NOT NULL,
+    customer_id BIGINT,
     plan_id BIGINT,
-    plan_code VARCHAR(64) NOT NULL,
-    plan_name VARCHAR(128) NOT NULL,
+    plan_code VARCHAR(64),
+    plan_name VARCHAR(128),
     plan_type VARCHAR(64),
-    monthly_fee DECIMAL(10, 2) NOT NULL,
+    monthly_fee DECIMAL(10, 2),
     channel_price_text VARCHAR(64),
     effective_monthly_fee DECIMAL(10, 2),
     effective_price_text VARCHAR(64),
@@ -244,75 +202,35 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     promotion_end_date DATE,
     discount_formula VARCHAR(512),
     customer_name VARCHAR(64),
-    contact_phone VARCHAR(32) NOT NULL,
+    contact_phone VARCHAR(32),
     customer_identity TINYINT NOT NULL DEFAULT 0,
     has_offer TINYINT NOT NULL DEFAULT 0,
     has_pass_or_hkid TINYINT NOT NULL DEFAULT 0,
     expected_start_date DATE,
     id_type VARCHAR(32),
-    id_no VARCHAR(64),
+    id_no VARCHAR(64) COMMENT '历史兼容字段，应用不得采集、写入或返回',
     referrer_phone VARCHAR(32),
     preferred_contact_time VARCHAR(128),
     remark VARCHAR(512),
     status VARCHAR(32) NOT NULL,
+    umall_order_no VARCHAR(64),
+    service_number VARCHAR(32),
+    activation_status VARCHAR(32),
+    contract_status VARCHAR(32),
+    order_source VARCHAR(32) NOT NULL DEFAULT 'H5',
+    reconciliation_status VARCHAR(32) NOT NULL DEFAULT '待对账',
+    source_record_id VARCHAR(64),
+    source_channel_name VARCHAR(128),
+    umall_status VARCHAR(32),
+    onboard_date DATE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_mobile_plan_order_plan_id (plan_id),
     INDEX idx_mobile_plan_order_customer_id (customer_id),
     INDEX idx_mobile_plan_order_plan_code (plan_code),
-    INDEX idx_mobile_plan_order_status (status)
+    INDEX idx_mobile_plan_order_status (status),
+    UNIQUE KEY uk_order_source_record (order_source, source_record_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CALL add_column_if_missing('mobile_plan_order', 'plan_id', 'BIGINT NULL', 'order_no');
-CALL add_column_if_missing('mobile_plan_order', 'customer_id', 'BIGINT NULL', 'order_no');
-CALL add_column_if_missing('mobile_plan_order', 'plan_type', 'VARCHAR(64) NULL', 'plan_name');
-CALL add_column_if_missing('mobile_plan_order', 'channel_price_text', 'VARCHAR(64) NULL', 'monthly_fee');
-CALL add_column_if_missing('mobile_plan_order', 'effective_monthly_fee', 'DECIMAL(10, 2) NULL', 'channel_price_text');
-CALL add_column_if_missing('mobile_plan_order', 'effective_price_text', 'VARCHAR(64) NULL', 'effective_monthly_fee');
-CALL add_column_if_missing('mobile_plan_order', 'official_monthly_fee', 'DECIMAL(10, 2) NULL', 'effective_price_text');
-CALL add_column_if_missing('mobile_plan_order', 'official_price_text', 'VARCHAR(64) NULL', 'official_monthly_fee');
-CALL add_column_if_missing('mobile_plan_order', 'data_quota', 'VARCHAR(128) NULL', 'official_price_text');
-CALL add_column_if_missing('mobile_plan_order', 'voice_quota', 'VARCHAR(128) NULL', 'data_quota');
-CALL add_column_if_missing('mobile_plan_order', 'roaming_benefit', 'VARCHAR(128) NULL', 'voice_quota');
-CALL add_column_if_missing('mobile_plan_order', 'contract_period', 'VARCHAR(64) NULL', 'roaming_benefit');
-CALL add_column_if_missing('mobile_plan_order', 'promotion_end_date', 'DATE NULL', 'contract_period');
-CALL add_column_if_missing('mobile_plan_order', 'discount_formula', 'VARCHAR(512) NULL', 'promotion_end_date');
-CALL add_column_if_missing('mobile_plan_order', 'customer_identity', 'TINYINT NOT NULL DEFAULT 0', 'contact_phone');
-CALL add_column_if_missing('mobile_plan_order', 'has_offer', 'TINYINT NOT NULL DEFAULT 0', 'customer_identity');
-CALL add_column_if_missing('mobile_plan_order', 'has_pass_or_hkid', 'TINYINT NOT NULL DEFAULT 0', 'has_offer');
-CALL add_column_if_missing('mobile_plan_order', 'expected_start_date', 'DATE NULL', 'has_pass_or_hkid');
-CALL add_column_if_missing('mobile_plan_order', 'id_type', 'VARCHAR(32) NULL', 'expected_start_date');
-CALL add_column_if_missing('mobile_plan_order', 'id_no', 'VARCHAR(64) NULL', 'id_type');
-CALL add_column_if_missing('mobile_plan_order', 'referrer_phone', 'VARCHAR(32) NULL', 'id_no');
-CALL add_column_if_missing('mobile_plan_order', 'preferred_contact_time', 'VARCHAR(128) NULL', 'referrer_phone');
-
-DROP PROCEDURE IF EXISTS drop_column_if_exists;
-
-DELIMITER //
-CREATE PROCEDURE drop_column_if_exists(
-    IN target_table VARCHAR(64),
-    IN target_column VARCHAR(64)
-)
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_schema = DATABASE()
-          AND table_name = target_table
-          AND column_name = target_column
-    ) THEN
-        SET @ddl = CONCAT('ALTER TABLE ', target_table, ' DROP COLUMN ', target_column);
-        PREPARE stmt FROM @ddl;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
-    END IF;
-END//
-DELIMITER ;
-
-CALL drop_column_if_exists('mobile_plan_order', 'has_offer_plus_or_hkid');
-CALL drop_column_if_exists('mobile_plan_order', 'has_offer_plus');
-
-DROP PROCEDURE IF EXISTS add_index_if_missing;
 
 CREATE TABLE IF NOT EXISTS channel (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -340,10 +258,22 @@ CREATE TABLE IF NOT EXISTS channel_entry (
 
 CREATE TABLE IF NOT EXISTS customer (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    phone VARCHAR(32) NOT NULL UNIQUE,
-    phone_verified_at DATETIME NOT NULL,
+    phone VARCHAR(32) UNIQUE,
+    phone_verified_at DATETIME,
+    name VARCHAR(64),
+    contact_method VARCHAR(128),
+    customer_type VARCHAR(32) NOT NULL DEFAULT 'DIRECT',
+    customer_category VARCHAR(32) COMMENT '业务客户类别，例如留学生、地产客户、研究生',
+    channel_id BIGINT,
+    intended_plan VARCHAR(128),
+    requirement_summary VARCHAR(512),
+    current_status TINYINT NOT NULL DEFAULT 0
+        COMMENT '客户状态码：0待处理，1跟进中，2待资料，3办理中，4待激活，5已激活，6已完成，9无效',
+    source_system VARCHAR(32),
+    source_customer_id VARCHAR(64),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_customer_source (source_system, source_customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS customer_channel_binding (
@@ -394,74 +324,7 @@ ON DUPLICATE KEY UPDATE
     entry_name = VALUES(entry_name),
     enabled = VALUES(enabled);
 
-DELIMITER //
-CREATE PROCEDURE add_index_if_missing(
-    IN target_table VARCHAR(64),
-    IN target_index VARCHAR(64),
-    IN index_definition VARCHAR(512)
-)
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM information_schema.statistics
-        WHERE table_schema = DATABASE()
-          AND table_name = target_table
-          AND index_name = target_index
-    ) THEN
-        SET @ddl = CONCAT('ALTER TABLE ', target_table, ' ADD INDEX ', target_index, ' ', index_definition);
-        PREPARE stmt FROM @ddl;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
-    END IF;
-END//
-DELIMITER ;
-
-CALL add_index_if_missing('mobile_plan_order', 'idx_mobile_plan_order_plan_id', '(plan_id)');
-CALL add_index_if_missing('mobile_plan_order', 'idx_mobile_plan_order_customer_id', '(customer_id)');
-
-DROP PROCEDURE IF EXISTS add_column_if_missing;
-DROP PROCEDURE IF EXISTS drop_column_if_exists;
-DROP PROCEDURE IF EXISTS add_index_if_missing;
-
 -- JOINCOM 管理后台 MVP：客户、订单、ICCID、甲方对账和二级渠道结算。
-DROP PROCEDURE IF EXISTS add_column_if_missing;
-DELIMITER //
-CREATE PROCEDURE add_column_if_missing(
-    IN target_table VARCHAR(64),
-    IN target_column VARCHAR(64),
-    IN column_definition VARCHAR(512),
-    IN after_column VARCHAR(64)
-)
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = DATABASE() AND table_name = target_table AND column_name = target_column
-    ) THEN
-        SET @ddl = CONCAT('ALTER TABLE ', target_table, ' ADD COLUMN ', target_column, ' ', column_definition,
-            IF(after_column IS NULL OR after_column = '', '', CONCAT(' AFTER ', after_column)));
-        PREPARE stmt FROM @ddl;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
-    END IF;
-END//
-DELIMITER ;
-
-CALL add_column_if_missing('customer', 'name', 'VARCHAR(64) NULL', 'phone_verified_at');
-CALL add_column_if_missing('customer', 'contact_method', 'VARCHAR(128) NULL', 'name');
-CALL add_column_if_missing('customer', 'customer_type', 'VARCHAR(32) NOT NULL DEFAULT ''DIRECT''', 'contact_method');
-CALL add_column_if_missing('customer', 'customer_category', 'VARCHAR(32) NULL COMMENT ''业务客户类别，例如留学生、地产客户、研究生''', 'customer_type');
-CALL add_column_if_missing('customer', 'channel_id', 'BIGINT NULL', 'customer_category');
-CALL add_column_if_missing('customer', 'intended_plan', 'VARCHAR(128) NULL', 'channel_id');
-CALL add_column_if_missing('customer', 'requirement_summary', 'VARCHAR(512) NULL', 'intended_plan');
-CALL add_column_if_missing('customer', 'current_status', 'TINYINT NOT NULL DEFAULT 0 COMMENT ''客户状态码：0待处理，1跟进中，2待资料，3办理中，4待激活，5已激活，6已完成，9无效''', 'requirement_summary');
-
-CALL add_column_if_missing('mobile_plan_order', 'umall_order_no', 'VARCHAR(64) NULL', 'status');
-CALL add_column_if_missing('mobile_plan_order', 'service_number', 'VARCHAR(32) NULL', 'umall_order_no');
-CALL add_column_if_missing('mobile_plan_order', 'activation_status', 'VARCHAR(32) NULL', 'service_number');
-CALL add_column_if_missing('mobile_plan_order', 'contract_status', 'VARCHAR(32) NULL', 'activation_status');
-CALL add_column_if_missing('mobile_plan_order', 'order_source', 'VARCHAR(32) NOT NULL DEFAULT ''H5''', 'contract_status');
-CALL add_column_if_missing('mobile_plan_order', 'reconciliation_status', 'VARCHAR(32) NOT NULL DEFAULT ''待对账''', 'order_source');
-
 CREATE TABLE IF NOT EXISTS iccid_inventory (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     iccid VARCHAR(32) NOT NULL UNIQUE,
@@ -473,6 +336,12 @@ CREATE TABLE IF NOT EXISTS iccid_inventory (
     used_at DATETIME,
     operator_name VARCHAR(64),
     remark VARCHAR(512),
+    card_type VARCHAR(16) NOT NULL DEFAULT 'REAL',
+    service_number VARCHAR(32),
+    source_system VARCHAR(32),
+    source_record_id VARCHAR(64),
+    replaced_by_iccid_id BIGINT,
+    replaced_at DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_iccid_status (status),
@@ -613,4 +482,35 @@ CREATE TABLE IF NOT EXISTS operation_log (
     INDEX idx_operation_log_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-DROP PROCEDURE IF EXISTS add_column_if_missing;
+CREATE TABLE IF NOT EXISTS customer_backup_import (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    file_name VARCHAR(255) NOT NULL,
+    file_hash CHAR(64) NOT NULL,
+    status VARCHAR(24) NOT NULL,
+    total_count INT NOT NULL DEFAULT 0,
+    customer_count INT NOT NULL DEFAULT 0,
+    order_count INT NOT NULL DEFAULT 0,
+    iccid_count INT NOT NULL DEFAULT 0,
+    exception_count INT NOT NULL DEFAULT 0,
+    operator_name VARCHAR(64) NOT NULL,
+    confirmed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_customer_backup_file_hash (file_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_backup_import_row (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    import_id BIGINT NOT NULL,
+    source_row_number INT NOT NULL,
+    source_id VARCHAR(64),
+    customer_id BIGINT,
+    order_id BIGINT,
+    iccid_id BIGINT,
+    result_status VARCHAR(24) NOT NULL,
+    exception_code VARCHAR(64),
+    exception_reason VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_customer_backup_row_import (import_id),
+    INDEX idx_customer_backup_row_source (source_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

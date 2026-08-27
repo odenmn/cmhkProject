@@ -69,7 +69,6 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
         order.setHasPassOrHkid(request.getHasPassOrHkid());
         order.setExpectedStartDate(request.getExpectedStartDate());
         order.setIdType(request.getIdType());
-        order.setIdNo(request.getIdNo());
         order.setReferrerPhone(request.getReferrerPhone());
         order.setPreferredContactTime(request.getPreferredContactTime());
         order.setRemark(request.getRemark());

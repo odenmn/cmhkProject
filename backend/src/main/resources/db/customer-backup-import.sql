@@ -1,4 +1,6 @@
--- CMHK 客户备份模拟导入：可重复执行的数据库升级脚本。
+-- 历史升级脚本：CMHK 客户备份模拟导入。
+-- 仅用于追溯已经执行过的升级，不得作为当前真实数据库的日常升级入口重复执行。
+-- 后续真实库升级统一使用 db/migrations 下按序编号的增量脚本。
 ALTER TABLE customer MODIFY phone VARCHAR(32) NULL;
 ALTER TABLE customer MODIFY phone_verified_at DATETIME NULL;
 ALTER TABLE mobile_plan_order MODIFY plan_code VARCHAR(64) NULL;

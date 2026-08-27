@@ -61,7 +61,6 @@ export interface MobilePlanOrderCreateRequest {
   hasPassOrHkid: number
   expectedStartDate?: string
   idType: string
-  idNo: string
   referrerPhone: string
   preferredContactTime: string
   remark: string
@@ -94,7 +93,6 @@ export interface MobilePlanOrder {
   hasPassOrHkid?: number
   expectedStartDate?: string
   idType?: string
-  idNo?: string
   referrerPhone?: string
   preferredContactTime?: string
   remark: string
