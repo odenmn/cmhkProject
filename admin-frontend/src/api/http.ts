@@ -2,7 +2,7 @@ import axios from 'axios'
 import router from '../router'
 
 export const SESSION_KEY = 'joincom_admin_session'
-export type AdminSession = { token:string; username:string; role:string }
+export type AdminSession = { token:string; userId:number; username:string; role:string; scopeType:string; scopeId:number|null }
 export function session():AdminSession|null { try{return JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null')}catch{return null} }
 export function saveSession(value:AdminSession){sessionStorage.setItem(SESSION_KEY,JSON.stringify(value))}
 export function clearSession(){sessionStorage.removeItem(SESSION_KEY)}

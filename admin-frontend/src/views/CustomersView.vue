@@ -34,6 +34,14 @@ function channelLabel(channelId?: number) {
   return channels.value.find(item => item.id === Number(channelId))?.channelName || (channelId ? `渠道 ${channelId}` : '—')
 }
 
+function formatDateTime(value?: string | number | null) {
+  if (value === null || value === undefined || value === '') return '—'
+  const numericValue = typeof value === 'number' ? value : Number(value)
+  const date = Number.isFinite(numericValue) && String(value).trim() !== '' ? new Date(numericValue < 100000000000 ? numericValue * 1000 : numericValue) : new Date(String(value))
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replaceAll('/', '-')
+}
+
 async function load() {
   loading.value = true
   try {
@@ -82,18 +90,19 @@ onMounted(load)
     </div>
     <div class="table-card">
       <div class="table-toolbar"><span class="table-title">客户档案</span><span class="table-meta">共 {{ rows.length }} 位客户</span></div>
-      <el-table :data="rows" v-loading="loading">
-        <el-table-column prop="name" label="客户姓名" min-width="120" />
-        <el-table-column label="上台号码" min-width="140"><template #default="scope">{{ scope.row.serviceNumber || '—' }}</template></el-table-column>
-        <el-table-column prop="contactMethod" label="联系方式" min-width="140" />
-        <el-table-column label="归属类型" width="110"><template #default="scope">{{ scope.row.customerType === 'CHANNEL' ? '渠道客户' : '自营客户' }}</template></el-table-column>
-        <el-table-column prop="customerCategory" label="客户类别" width="120" />
-        <el-table-column label="渠道" min-width="150"><template #default="scope">{{ channelLabel(scope.row.channelId) }}</template></el-table-column>
-        <el-table-column prop="intendedPlan" label="意向套餐" min-width="160" />
-        <el-table-column label="当前状态" width="120"><template #default="scope">{{ statusLabel(scope.row.currentStatus) }}</template></el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" min-width="165" />
-        <el-table-column label="操作" fixed="right" width="150"><template #default="scope"><el-button link type="primary" @click="router.push(`/customers/${scope.row.id}`)">详情</el-button><el-button link @click="open(scope.row)">编辑</el-button></template></el-table-column>
-      </el-table>
+      <div class="table-scroll">
+        <el-table class="desktop-data-table desktop-data-table--customers" :data="rows" v-loading="loading">
+        <el-table-column prop="name" label="客户姓名" min-width="95" />
+        <el-table-column label="上台号码" min-width="120"><template #default="scope">{{ scope.row.serviceNumber || '—' }}</template></el-table-column>
+        <el-table-column label="归属类型" width="95"><template #default="scope">{{ scope.row.customerType === 'CHANNEL' ? '渠道客户' : '自营客户' }}</template></el-table-column>
+        <el-table-column prop="customerCategory" label="客户类别" width="100" />
+        <el-table-column label="渠道" min-width="120"><template #default="scope">{{ channelLabel(scope.row.channelId) }}</template></el-table-column>
+        <el-table-column prop="intendedPlan" label="意向套餐" min-width="130" />
+        <el-table-column label="当前状态" width="90"><template #default="scope">{{ statusLabel(scope.row.currentStatus) }}</template></el-table-column>
+        <el-table-column label="创建时间" min-width="145"><template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template></el-table-column>
+        <el-table-column label="操作" width="110"><template #default="scope"><el-button link type="primary" @click="router.push(`/customers/${scope.row.id}`)">详情</el-button><el-button link @click="open(scope.row)">编辑</el-button></template></el-table-column>
+        </el-table>
+      </div>
     </div>
     <el-dialog v-model="visible" :title="editing ? '编辑客户' : '新增客户'" width="680">
       <el-form label-position="top" class="customer-form">
