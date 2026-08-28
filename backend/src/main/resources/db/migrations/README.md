@@ -23,4 +23,8 @@
 
 P0只建立迁移基线，没有作用于真实库的结构变更。
 
-P1已于2026-08-27执行`V001__unify_channels_and_admin_permissions.sql`，统一渠道主档并扩展管理员权限字段。后续真实结构升级从`V002__功能名称.sql`开始。
+P1已于2026-08-27执行`V001__unify_channels_and_admin_permissions.sql`，统一渠道主档并扩展管理员权限字段。
+
+P2已执行`V002__standardize_customers_orders_and_products.sql`，标准化客户、订单和产品外围结构。
+
+P3使用`V003__resource_pool_and_referral_chains.sql`新增多接龙推荐号码表，并为既有 ICCID 当前绑定补充迁移基线历史；脚本不会自动推断历史接龙关系。

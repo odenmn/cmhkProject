@@ -610,3 +610,62 @@ CREATE TABLE IF NOT EXISTS channel_product_policy (
     UNIQUE KEY uk_channel_product_policy (channel_id, plan_id),
     INDEX idx_channel_product_policy_plan (plan_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS referral_chain (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    chain_code VARCHAR(64) NOT NULL,
+    chain_name VARCHAR(128) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/PAUSED/CLOSED',
+    current_head_number_id BIGINT,
+    operator_name VARCHAR(64),
+    remark VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_referral_chain_code (chain_code),
+    UNIQUE KEY uk_referral_chain_head (current_head_number_id),
+    INDEX idx_referral_chain_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS referral_number_pool (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    chain_id BIGINT NOT NULL,
+    referral_number VARCHAR(32) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'DISABLED' COMMENT 'AVAILABLE/RESERVED/USED/DISABLED',
+    source_type VARCHAR(32) NOT NULL COMMENT 'ORDER/CONFIRMED_IMPORT',
+    source_order_id BIGINT,
+    source_reference VARCHAR(128),
+    previous_number_id BIGINT,
+    next_number_id BIGINT,
+    assigned_customer_id BIGINT,
+    assigned_order_id BIGINT,
+    reserved_at DATETIME,
+    used_at DATETIME,
+    disabled_at DATETIME,
+    operator_name VARCHAR(64),
+    remark VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_referral_number (referral_number),
+    UNIQUE KEY uk_referral_assigned_order (assigned_order_id),
+    INDEX idx_referral_number_chain_status (chain_id, status),
+    INDEX idx_referral_number_source_order (source_order_id),
+    INDEX idx_referral_number_customer (assigned_customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS referral_number_assignment_history (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    chain_id BIGINT NOT NULL,
+    referral_number_id BIGINT NOT NULL,
+    referral_number VARCHAR(32) NOT NULL,
+    customer_id BIGINT,
+    order_id BIGINT,
+    action_type VARCHAR(32) NOT NULL,
+    operator_user_id BIGINT,
+    operator_name VARCHAR(64),
+    reason VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_referral_history_chain (chain_id),
+    INDEX idx_referral_history_number (referral_number_id),
+    INDEX idx_referral_history_order (order_id),
+    INDEX idx_referral_history_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

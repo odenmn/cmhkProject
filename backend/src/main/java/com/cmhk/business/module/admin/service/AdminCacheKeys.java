@@ -12,6 +12,7 @@ public final class AdminCacheKeys {
     public static final String CUSTOMER_CHANNELS = "cmhk:admin:customer-channels:";
     public static final String ORDERS = "cmhk:admin:orders:";
     public static final String ICCIDS = "cmhk:admin:iccids:";
+    public static final String RESOURCES = "cmhk:admin:resources:";
 
     private AdminCacheKeys() {
     }

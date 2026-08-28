@@ -23,6 +23,8 @@ import com.cmhk.business.module.channel.mapper.ChannelMapper;
 import com.cmhk.business.module.channel.mapper.CustomerChannelBindingMapper;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
+import com.cmhk.business.module.resource.entity.ReferralNumber;
+import com.cmhk.business.module.resource.mapper.ReferralNumberMapper;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,7 @@ public class AdminCustomerService {
     private final CustomerMapper customerMapper;
     private final MobilePlanOrderMapper orderMapper;
     private final IccidInventoryMapper iccidMapper;
+    private final ReferralNumberMapper referralNumberMapper;
     private final ReconciliationRowMapper reconciliationRowMapper;
     private final SecondaryCommissionRecordMapper commissionRecordMapper;
     private final OperationLogService logService;
@@ -56,7 +59,8 @@ public class AdminCustomerService {
     private final JavaType detailType;
 
     public AdminCustomerService(CustomerMapper customerMapper, MobilePlanOrderMapper orderMapper,
-                                IccidInventoryMapper iccidMapper, ReconciliationRowMapper reconciliationRowMapper,
+                                IccidInventoryMapper iccidMapper, ReferralNumberMapper referralNumberMapper,
+                                ReconciliationRowMapper reconciliationRowMapper,
                                 SecondaryCommissionRecordMapper commissionRecordMapper, OperationLogService logService,
                                 ChannelMapper channelMapper, CustomerChannelBindingMapper bindingMapper,
                                 CustomerFollowUpMapper followUpMapper, AdminUserMapper adminUserMapper,
@@ -64,6 +68,7 @@ public class AdminCustomerService {
         this.customerMapper = customerMapper;
         this.orderMapper = orderMapper;
         this.iccidMapper = iccidMapper;
+        this.referralNumberMapper = referralNumberMapper;
         this.reconciliationRowMapper = reconciliationRowMapper;
         this.commissionRecordMapper = commissionRecordMapper;
         this.logService = logService;
@@ -199,6 +204,13 @@ public class AdminCustomerService {
         result.put("owner", customer.getOwnerUserId() == null ? null : adminUserMapper.selectById(customer.getOwnerUserId()));
         result.put("orders", orders);
         result.put("iccids", iccids);
+        LambdaQueryWrapper<ReferralNumber> referralQuery = new LambdaQueryWrapper<>();
+        referralQuery.eq(ReferralNumber::getAssignedCustomerId, id);
+        if (!orderIds.isEmpty()) {
+            referralQuery.or().in(ReferralNumber::getSourceOrderId, orderIds);
+        }
+        result.put("referralNumbers", referralNumberMapper.selectList(referralQuery
+                .orderByDesc(ReferralNumber::getId)));
         result.put("reconciliationRows", rows);
         result.put("commissionRecords", commissions);
         result.put("followUps", followUps(id));
