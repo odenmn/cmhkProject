@@ -18,11 +18,12 @@ const statusOptions = [
 const router = useRouter()
 const rows = ref<any[]>([])
 const channels = ref<any[]>([])
+const owners = ref<any[]>([])
 const loading = ref(false)
 const visible = ref(false)
 const editing = ref<any>(null)
 const filters = reactive<{ keyword: string; type: string; status?: number }>({ keyword: '', type: '', status: undefined })
-const emptyForm = () => ({ name: '', phone: '', contactMethod: '', customerType: 'DIRECT', customerCategory: '', channelId: null, intendedPlan: '', requirementSummary: '', currentStatus: 0 })
+const emptyForm = () => ({ name: '', phone: '', contactMethod: '', customerType: 'DIRECT', customerCategory: '', channelId: null, ownerUserId: null, intendedPlan: '', requirementSummary: '', currentStatus: 0 })
 const form = reactive<any>(emptyForm())
 
 function statusLabel(value: number) {
@@ -45,9 +46,10 @@ function formatDateTime(value?: string | number | null) {
 async function load() {
   loading.value = true
   try {
-    const result = await Promise.all([api.customers(filters), api.customerChannels()]) as any
+    const result = await Promise.all([api.customers(filters), api.customerChannels(), api.customerOwners()]) as any
     rows.value = result[0]
     channels.value = result[1]
+    owners.value = result[2]
   } catch (error: any) {
     ElMessage.error(error.message)
   } finally {
@@ -113,6 +115,7 @@ onMounted(load)
           <el-col :span="12"><el-form-item label="归属类型"><el-select v-model="form.customerType" style="width: 100%"><el-option label="自营客户" value="DIRECT" /><el-option label="渠道客户" value="CHANNEL" /></el-select></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="客户类别"><el-input v-model="form.customerCategory" placeholder="留学生 / 地产客户" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="渠道"><el-select v-model="form.channelId" clearable style="width: 100%"><el-option v-for="channel in channels" :key="channel.id" :label="channel.channelName" :value="channel.id" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="内部负责人"><el-select v-model="form.ownerUserId" clearable style="width: 100%"><el-option v-for="owner in owners" :key="owner.id" :label="owner.displayName || owner.username" :value="owner.id" /></el-select></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="当前状态"><el-select v-model="form.currentStatus" style="width: 100%"><el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item></el-col>
           <el-col :span="24"><el-form-item label="意向套餐"><el-input v-model="form.intendedPlan" /></el-form-item></el-col>
           <el-col :span="24"><el-form-item label="需求摘要"><el-input v-model="form.requirementSummary" type="textarea" :rows="3" /></el-form-item></el-col>
