@@ -29,12 +29,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.UUID;
 
 /** 通过数据库行锁和唯一索引保证多条接龙并发分配安全。 */
 @Service
@@ -78,10 +80,12 @@ public class ReferralNumberServiceImpl implements ReferralNumberService {
     @Override
     public List<Map<String, Object>> chains() {
         List<Map<String, Object>> result = new ArrayList<>();
+        int chainNumber = 1;
         for (ReferralChain chain : chainMapper.selectList(new LambdaQueryWrapper<ReferralChain>()
-                .orderByDesc(ReferralChain::getId))) {
+                .orderByAsc(ReferralChain::getId))) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("chain", chain);
+            item.put("chainNumber", chainNumber++);
             item.put("head", chain.getCurrentHeadNumberId() == null
                     ? null
                     : numberMapper.selectById(chain.getCurrentHeadNumberId()));
@@ -89,6 +93,49 @@ public class ReferralNumberServiceImpl implements ReferralNumberService {
                     .eq(ReferralNumber::getChainId, chain.getId())));
             result.add(item);
         }
+        return result;
+    }
+
+    /** 将上一号码、下一号码关系整理为管理端可直接展示的完整接龙顺序。 */
+    @Override
+    public Map<String, Object> trace(Long chainId) {
+        ReferralChain chain = chainMapper.selectById(chainId);
+        if (chain == null) {
+            throw new IllegalArgumentException("接龙不存在");
+        }
+        List<ReferralNumber> numbers = numberMapper.selectList(new LambdaQueryWrapper<ReferralNumber>()
+                .eq(ReferralNumber::getChainId, chainId)
+                .orderByAsc(ReferralNumber::getId));
+        Map<Long, ReferralNumber> numberById = new HashMap<>();
+        Map<Long, ReferralNumber> nextByPreviousId = new HashMap<>();
+        List<ReferralNumber> roots = new ArrayList<>();
+        for (ReferralNumber number : numbers) {
+            numberById.put(number.getId(), number);
+            if (number.getPreviousNumberId() == null) {
+                roots.add(number);
+            } else {
+                nextByPreviousId.put(number.getPreviousNumberId(), number);
+            }
+        }
+        List<Map<String, Object>> entries = new ArrayList<>();
+        Set<Long> visited = new HashSet<>();
+        for (ReferralNumber root : roots) {
+            appendTraceEntries(root, nextByPreviousId, visited, entries, chain.getCurrentHeadNumberId());
+        }
+        for (ReferralNumber number : numbers) {
+            if (!visited.contains(number.getId())) {
+                appendTraceEntries(number, nextByPreviousId, visited, entries, chain.getCurrentHeadNumberId());
+            }
+        }
+        for (int index = 0; index < entries.size(); index++) {
+            entries.get(index).put("sequence", index + 1);
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("chain", chain);
+        result.put("head", chain.getCurrentHeadNumberId() == null
+                ? null
+                : numberById.get(chain.getCurrentHeadNumberId()));
+        result.put("entries", entries);
         return result;
     }
 
@@ -131,22 +178,41 @@ public class ReferralNumberServiceImpl implements ReferralNumberService {
     @Override
     @Transactional
     public ReferralChain createChain(
-            String code,
             String name,
+            String initialReferralNumber,
             String remark,
             AdminPrincipal principal) {
         ReferralChain chain = new ReferralChain();
-        chain.setChainCode(required(code, "接龙编码不能为空"));
         chain.setChainName(required(name, "接龙名称不能为空"));
+        chain.setChainCode("REF-CREATING-" + UUID.randomUUID());
         chain.setStatus(ACTIVE);
         chain.setOperatorName(principal.username());
         chain.setRemark(remark);
         try {
             chainMapper.insert(chain);
+            chain.setChainCode(String.format("REF-%06d", chain.getId()));
+            chainMapper.updateById(chain);
         } catch (DuplicateKeyException exception) {
-            throw new IllegalArgumentException("接龙编码已存在");
+            throw new IllegalArgumentException("接龙创建失败，请重试");
         }
+        ReferralNumber initialHead = new ReferralNumber();
+        initialHead.setChainId(chain.getId());
+        initialHead.setReferralNumber(normalizeNumber(initialReferralNumber));
+        initialHead.setStatus(AVAILABLE);
+        initialHead.setSourceType("MANUAL_INITIAL_HEAD");
+        initialHead.setSourceReference(chain.getChainCode());
+        initialHead.setOperatorName(principal.username());
+        initialHead.setRemark("创建接龙时录入的初始龙头");
+        try {
+            numberMapper.insert(initialHead);
+        } catch (DuplicateKeyException exception) {
+            throw new IllegalArgumentException("推荐号码已属于其他接龙");
+        }
+        chain.setCurrentHeadNumberId(initialHead.getId());
+        chainMapper.updateById(chain);
+        recordHistory(initialHead, "CREATE_HEAD", null, null, principal, initialHead.getRemark());
         logService.record(principal.username(), "REFERRAL_CHAIN_CREATE", "REFERRAL_CHAIN", chain.getId(), null, chain, remark);
+        logService.record(principal.username(), "REFERRAL_HEAD_CREATE", "REFERRAL_NUMBER", initialHead.getId(), null, initialHead, initialHead.getRemark());
         return chain;
     }
 
@@ -503,6 +569,28 @@ public class ReferralNumberServiceImpl implements ReferralNumberService {
         }
         result.put("chains", chainDetails);
         return result;
+    }
+
+    /** 递归追加一条线性接龙，并保留异常孤立节点用于人工发现数据问题。 */
+    private void appendTraceEntries(
+            ReferralNumber current,
+            Map<Long, ReferralNumber> nextByPreviousId,
+            Set<Long> visited,
+            List<Map<String, Object>> entries,
+            Long currentHeadNumberId) {
+        ReferralNumber cursor = current;
+        while (cursor != null && visited.add(cursor.getId())) {
+            MobilePlanOrder order = cursor.getAssignedOrderId() == null
+                    ? null
+                    : orderMapper.selectById(cursor.getAssignedOrderId());
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("number", cursor);
+            entry.put("orderNo", order == null ? null : order.getOrderNo());
+            entry.put("customerName", order == null ? null : order.getCustomerName());
+            entry.put("isCurrentHead", cursor.getId().equals(currentHeadNumberId));
+            entries.add(entry);
+            cursor = nextByPreviousId.get(cursor.getId());
+        }
     }
 
     private void clearOrderReferrer(Long orderId, String referralNumber) {

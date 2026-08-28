@@ -36,13 +36,19 @@ public class AdminReferralNumberController {
         return ApiResponse.success(service.chains());
     }
 
+    /** 查看一条接龙从初始号码到当前龙头的完整号码顺序。 */
+    @GetMapping("/chains/{id}/trace")
+    public ApiResponse<Map<String, Object>> trace(@PathVariable Long id) {
+        return ApiResponse.success(service.trace(id));
+    }
+
     @PostMapping("/chains")
     public ApiResponse<ReferralChain> createChain(
             @RequestBody ChainRequest request,
             @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
         return ApiResponse.success(service.createChain(
-                request.chainCode(),
                 request.chainName(),
+                request.initialReferralNumber(),
                 request.remark(),
                 principal));
     }
@@ -137,7 +143,7 @@ public class AdminReferralNumberController {
         return ApiResponse.success(service.history(id));
     }
 
-    public record ChainRequest(String chainCode, String chainName, String remark) {}
+    public record ChainRequest(String chainName, String initialReferralNumber, String remark) {}
     public record StatusRequest(String status, String reason) {}
     public record CandidateRequest(String referralNumber, String sourceReference) {}
     public record HeadRequest(Long numberId, String reason) {}

@@ -13,9 +13,12 @@ import java.util.Map;
 /** 多接龙推荐号码业务。 */
 public interface ReferralNumberService {
     List<Map<String, Object>> chains();
+
+    /** 返回一条接龙从初始号码到当前龙头的完整顺序。 */
+    Map<String, Object> trace(Long chainId);
     List<Map<String, Object>> numbers(Long chainId, String status, String keyword);
     List<MobilePlanOrder> eligibleOrders();
-    ReferralChain createChain(String code, String name, String remark, AdminPrincipal principal);
+    ReferralChain createChain(String name, String initialReferralNumber, String remark, AdminPrincipal principal);
     ReferralChain changeChainStatus(Long chainId, String status, String reason, AdminPrincipal principal);
     ReferralNumber addCandidate(Long chainId, String number, String sourceReference, AdminPrincipal principal);
     Map<String, Object> previewImport(Long chainId, MultipartFile file);
