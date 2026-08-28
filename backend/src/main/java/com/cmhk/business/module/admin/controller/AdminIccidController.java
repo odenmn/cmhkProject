@@ -101,6 +101,19 @@ public class AdminIccidController {
         return ApiResponse.success(service.disable(id, request.reason(), principal.username()));
     }
 
+    /** 用真实 ICCID 替换订单当前绑定的虚拟 ICCID，并保留双方历史。 */
+    @PostMapping("/{id}/replace")
+    public ApiResponse<IccidInventory> replace(
+            @PathVariable Long id,
+            @RequestBody ReplaceRequest request,
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        return ApiResponse.success(service.replaceVirtual(
+                id,
+                request.realIccidId(),
+                request.reason(),
+                principal.username()));
+    }
+
     /** 查看单张 ICCID 的分配与状态变更历史。 */
     @GetMapping("/{id}/history")
     public ApiResponse<List<IccidAssignmentHistory>> history(@PathVariable Long id) {
@@ -112,4 +125,6 @@ public class AdminIccidController {
     public record AssignRequest(Long customerId, Long orderId, String reason) {}
 
     public record ReasonRequest(String reason) {}
+
+    public record ReplaceRequest(Long realIccidId, String reason) {}
 }

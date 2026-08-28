@@ -101,6 +101,13 @@ public class AdminIccidServiceImpl implements AdminIccidService {
     }
 
     @Override
+    public IccidInventory replaceVirtual(Long virtualId, Long realId, String reason, String operator) {
+        IccidInventory result = delegate.replaceVirtual(virtualId, realId, reason, operator);
+        invalidateRelationCaches();
+        return result;
+    }
+
+    @Override
     public List<IccidAssignmentHistory> history(Long id) {
         String key = cacheClient.versionedKey(AdminCacheKeys.ICCIDS, "history:" + id);
         return cacheClient.queryWithMutex(

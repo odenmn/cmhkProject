@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import{onMounted,reactive,ref}from'vue';import{ElMessage,ElMessageBox,type UploadFile}from'element-plus';import{api}from'../api/admin';
 const loading=ref(false),rows=ref<any[]>([]),customers=ref<any[]>([]),orders=ref<any[]>([]),history=ref<any[]>([]),historyVisible=ref(false);const filters=reactive({iccid:'',batch:'',status:'',serviceNumber:'',orderNo:''});const createVisible=ref(false),importVisible=ref(false),assignVisible=ref(false),selected=ref<any>();const createForm=reactive({iccid:'',batchNo:'',remark:''}),importForm=reactive<{batchNo:string,file:File|null}>({batchNo:'',file:null}),assignForm=reactive<any>({customerId:null,orderId:null,reason:''});
-const statusLabel=(value:string)=>({AVAILABLE:'可用',ASSIGNED:'已占用',USED:'已使用',DISABLED:'已停用'} as Record<string,string>)[value]||value;
+const statusLabel=(value:string)=>({AVAILABLE:'可用',ASSIGNED:'已占用',USED:'已使用',DISABLED:'已停用',REPLACED:'已替换'} as Record<string,string>)[value]||value;
 function formatDateTime(value?:string|number|null){if(value===null||value===undefined||value==='')return '—';const numeric=typeof value==='number'?value:Number(value);const date=Number.isFinite(numeric)&&String(value).trim()!==''?new Date(numeric<100000000000?numeric*1000:numeric):new Date(String(value));if(Number.isNaN(date.getTime()))return String(value);return date.toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).replaceAll('/','-')}
 async function load(){loading.value=true;try{rows.value=await api.iccids(filters) as any[]}catch(e:any){ElMessage.error(e.message)}finally{loading.value=false}}
 async function loadRefs(){customers.value=await api.customers() as any[];orders.value=await api.orders() as any[]}

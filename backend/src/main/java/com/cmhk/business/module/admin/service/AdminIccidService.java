@@ -23,5 +23,7 @@ public interface AdminIccidService {
 
     IccidInventory disable(Long id, String reason, String operator);
 
+    IccidInventory replaceVirtual(Long virtualId, Long realId, String reason, String operator);
+
     List<IccidAssignmentHistory> history(Long id);
 }

@@ -21,7 +21,7 @@ import java.util.*;
 
 @Service
 public class IccidService {
-    public static final String AVAILABLE="AVAILABLE", ASSIGNED="ASSIGNED", USED="USED", DISABLED="DISABLED";
+    public static final String AVAILABLE="AVAILABLE", ASSIGNED="ASSIGNED", USED="USED", DISABLED="DISABLED", REPLACED="REPLACED";
     private final IccidInventoryMapper mapper; private final IccidAssignmentHistoryMapper historyMapper; private final CustomerMapper customerMapper; private final MobilePlanOrderMapper orderMapper; private final OperationLogService logService; private final TabularFileReader fileReader;
     public IccidService(IccidInventoryMapper mapper,IccidAssignmentHistoryMapper historyMapper,CustomerMapper customerMapper,MobilePlanOrderMapper orderMapper,OperationLogService logService,TabularFileReader fileReader){this.mapper=mapper;this.historyMapper=historyMapper;this.customerMapper=customerMapper;this.orderMapper=orderMapper;this.logService=logService;this.fileReader=fileReader;}
 
@@ -76,26 +76,94 @@ public class IccidService {
     @Transactional
     public IccidInventory unassign(Long id,String reason,String operator){
         if(!notBlank(reason))throw new IllegalArgumentException("解绑必须填写原因");
-        IccidInventory before=required(id);if(!ASSIGNED.equals(before.getStatus()))throw new IllegalArgumentException("只有已占用ICCID可以解绑");history(before,"UNASSIGN",before.getCurrentCustomerId(),before.getCurrentOrderId(),reason,operator);mapper.update(null,new LambdaUpdateWrapper<IccidInventory>().eq(IccidInventory::getId,id).eq(IccidInventory::getStatus,ASSIGNED).set(IccidInventory::getStatus,AVAILABLE).set(IccidInventory::getCurrentCustomerId,null).set(IccidInventory::getCurrentOrderId,null).set(IccidInventory::getAssignedAt,null).set(IccidInventory::getOperatorName,operator));IccidInventory after=required(id);logService.record(operator,"ICCID_UNASSIGN","ICCID",id,before,after,reason);return after;}
+        IccidInventory before=required(id);
+        if(!ASSIGNED.equals(before.getStatus()))throw new IllegalArgumentException("只有已占用ICCID可以解绑");
+        int changed=mapper.update(null,new LambdaUpdateWrapper<IccidInventory>()
+                .eq(IccidInventory::getId,id)
+                .eq(IccidInventory::getStatus,ASSIGNED)
+                .set(IccidInventory::getStatus,AVAILABLE)
+                .set(IccidInventory::getCurrentCustomerId,null)
+                .set(IccidInventory::getCurrentOrderId,null)
+                .set(IccidInventory::getAssignedAt,null)
+                .set(IccidInventory::getOperatorName,operator));
+        if(changed!=1)throw new IllegalArgumentException("ICCID状态已变化，请刷新后重试");
+        history(before,"UNASSIGN",before.getCurrentCustomerId(),before.getCurrentOrderId(),reason,operator);
+        IccidInventory after=required(id);
+        logService.record(operator,"ICCID_UNASSIGN","ICCID",id,before,after,reason);
+        return after;
+    }
 
     @Transactional
     public IccidInventory markUsed(Long id,String operator){
         IccidInventory before=required(id);
         if(!ASSIGNED.equals(before.getStatus()))throw new IllegalArgumentException("只有已占用ICCID可以标记使用");
-        IccidInventory after=copy(before);after.setStatus(USED);after.setUsedAt(LocalDateTime.now());after.setOperatorName(operator);
-        mapper.updateById(after);
+        int changed=mapper.update(null,new LambdaUpdateWrapper<IccidInventory>()
+                .eq(IccidInventory::getId,id)
+                .eq(IccidInventory::getStatus,ASSIGNED)
+                .set(IccidInventory::getStatus,USED)
+                .set(IccidInventory::getUsedAt,LocalDateTime.now())
+                .set(IccidInventory::getOperatorName,operator));
+        if(changed!=1)throw new IllegalArgumentException("ICCID状态已变化，请刷新后重试");
+        IccidInventory after=required(id);
         history(after,"MARK_USED",after.getCurrentCustomerId(),after.getCurrentOrderId(),null,operator);
         logService.record(operator,"ICCID_MARK_USED","ICCID",id,before,after,null);return after;}
 
     @Transactional
     public IccidInventory disable(Long id,String reason,String operator){
+        if(!notBlank(reason))throw new IllegalArgumentException("停用必须填写原因");
         IccidInventory before=required(id);
         if(!AVAILABLE.equals(before.getStatus()))throw new IllegalArgumentException("只有可用ICCID可以停用");
-        IccidInventory after=copy(before);after.setStatus(DISABLED);
-        after.setRemark(reason);after.setOperatorName(operator);
-        mapper.updateById(after);
+        int changed=mapper.update(null,new LambdaUpdateWrapper<IccidInventory>()
+                .eq(IccidInventory::getId,id)
+                .eq(IccidInventory::getStatus,AVAILABLE)
+                .set(IccidInventory::getStatus,DISABLED)
+                .set(IccidInventory::getRemark,reason)
+                .set(IccidInventory::getOperatorName,operator));
+        if(changed!=1)throw new IllegalArgumentException("ICCID状态已变化，请刷新后重试");
+        IccidInventory after=required(id);
         logService.record(operator,"ICCID_DISABLE","ICCID",id,before,after,reason);
         return after;
+    }
+
+    /** 将虚拟卡的当前关系原子迁移到一张真实可用卡。 */
+    @Transactional
+    public IccidInventory replaceVirtual(Long virtualId,Long realId,String reason,String operator){
+        if(!notBlank(reason))throw new IllegalArgumentException("替换必须填写原因");
+        if(Objects.equals(virtualId,realId))throw new IllegalArgumentException("虚拟卡和真实卡不能相同");
+        Long firstId=Math.min(virtualId,realId);
+        Long secondId=Math.max(virtualId,realId);
+        IccidInventory first=mapper.selectByIdForUpdate(firstId);
+        IccidInventory second=mapper.selectByIdForUpdate(secondId);
+        if(first==null||second==null)throw new IllegalArgumentException("ICCID不存在");
+        IccidInventory virtual=Objects.equals(first.getId(),virtualId)?first:second;
+        IccidInventory real=Objects.equals(first.getId(),realId)?first:second;
+        if(!"VIRTUAL".equals(virtual.getCardType())||!USED.equals(virtual.getStatus()))throw new IllegalArgumentException("只有使用中的虚拟ICCID可以替换");
+        if(!"REAL".equals(real.getCardType())||!AVAILABLE.equals(real.getStatus()))throw new IllegalArgumentException("替换目标必须是真实可用ICCID");
+        IccidInventory virtualBefore=copy(virtual);
+        IccidInventory realBefore=copy(real);
+        real.setStatus(USED);
+        real.setCurrentCustomerId(virtual.getCurrentCustomerId());
+        real.setCurrentOrderId(virtual.getCurrentOrderId());
+        real.setServiceNumber(virtual.getServiceNumber());
+        real.setAssignedAt(LocalDateTime.now());
+        real.setUsedAt(LocalDateTime.now());
+        real.setOperatorName(operator);
+        real.setRemark(reason);
+        mapper.updateById(real);
+        history(real,"REPLACE_IN",real.getCurrentCustomerId(),real.getCurrentOrderId(),reason,operator);
+        history(virtual,"REPLACE_OUT",virtual.getCurrentCustomerId(),virtual.getCurrentOrderId(),reason,operator);
+        virtual.setStatus(REPLACED);
+        virtual.setReplacedByIccidId(real.getId());
+        virtual.setReplacedAt(LocalDateTime.now());
+        virtual.setCurrentCustomerId(null);
+        virtual.setCurrentOrderId(null);
+        virtual.setAssignedAt(null);
+        virtual.setUsedAt(null);
+        virtual.setOperatorName(operator);
+        virtual.setRemark(reason);
+        mapper.updateById(virtual);
+        logService.record(operator,"ICCID_REPLACE","ICCID",virtualId,Map.of("virtual",virtualBefore,"real",realBefore),Map.of("virtual",virtual,"real",real),reason);
+        return real;
     }
 
     public List<IccidAssignmentHistory> history(Long id){return historyMapper.selectList(new LambdaQueryWrapper<IccidAssignmentHistory>().eq(IccidAssignmentHistory::getIccidId,id).orderByDesc(IccidAssignmentHistory::getId));}
