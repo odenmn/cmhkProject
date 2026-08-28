@@ -29,6 +29,10 @@ class AdminPermissionPolicyTests {
         assertFalse(policy.isAllowed(operator, "POST", "/api/admin/secondary/records/1/adjust"));
         assertFalse(policy.isAllowed(operator, "POST", "/api/admin/secondary/records/1/confirm"));
         assertTrue(policy.isAllowed(operator, "POST", "/api/admin/secondary/records/calculate"));
+        assertTrue(policy.isAllowed(operator, "GET", "/api/admin/products/plans"));
+        assertFalse(policy.isAllowed(operator, "POST", "/api/admin/products/plans"));
+        assertFalse(policy.isAllowed(operator, "DELETE", "/api/admin/products/offers/1"));
+        assertTrue(policy.isAllowed(admin, "POST", "/api/admin/products/policies"));
     }
 
     @Test

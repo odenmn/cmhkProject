@@ -5,6 +5,8 @@ import com.cmhk.business.config.AdminAuthInterceptor;
 import com.cmhk.business.module.admin.service.AdminCustomerService;
 import com.cmhk.business.module.admin.security.AdminPrincipal;
 import com.cmhk.business.module.customer.entity.Customer;
+import com.cmhk.business.module.customer.entity.CustomerFollowUp;
+import com.cmhk.business.module.admin.dto.AdminOwnerOption;
 import com.cmhk.business.module.channel.entity.Channel;
 import org.slf4j.Logger; import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +26,19 @@ public class AdminCustomerController {
     }
     @GetMapping("/channels") public ApiResponse<List<Channel>> channels(
             @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) { return ApiResponse.success(service.channels(principal)); }
+    @GetMapping("/owners") public ApiResponse<List<AdminOwnerOption>> owners() { return ApiResponse.success(service.owners()); }
+    @GetMapping("/{id}/follow-ups") public ApiResponse<List<CustomerFollowUp>> followUps(
+            @PathVariable Long id,
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        service.detail(id, principal);
+        return ApiResponse.success(service.followUps(id));
+    }
+    @PostMapping("/{id}/follow-ups") public ApiResponse<CustomerFollowUp> addFollowUp(
+            @PathVariable Long id,
+            @RequestBody CustomerFollowUp input,
+            @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) {
+        return ApiResponse.success(service.addFollowUp(id, input, principal));
+    }
     @GetMapping("/{id}") public ApiResponse<Map<String,Object>> detail(@PathVariable Long id,
             @RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal) { return ApiResponse.success(service.detail(id, principal)); }
     @PostMapping public ApiResponse<Customer> create(@RequestBody Customer value,

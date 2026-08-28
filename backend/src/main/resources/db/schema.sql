@@ -217,6 +217,8 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     preferred_contact_time VARCHAR(128),
     remark VARCHAR(512),
     status VARCHAR(32) NOT NULL,
+    review_status VARCHAR(32) COMMENT 'UMALL审核状态',
+    supplement_status VARCHAR(32) COMMENT 'UMALL补件状态',
     umall_order_no VARCHAR(64),
     service_number VARCHAR(32),
     activation_status VARCHAR(32),
@@ -226,6 +228,7 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     source_record_id VARCHAR(64),
     source_channel_name VARCHAR(128),
     umall_status VARCHAR(32),
+    status_updated_at DATETIME COMMENT '统一办理状态最近更新时间',
     onboard_date DATE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -233,6 +236,8 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     INDEX idx_mobile_plan_order_customer_id (customer_id),
     INDEX idx_mobile_plan_order_plan_code (plan_code),
     INDEX idx_mobile_plan_order_status (status),
+    INDEX idx_mobile_plan_order_review_status (review_status),
+    INDEX idx_mobile_plan_order_status_updated_at (status_updated_at),
     UNIQUE KEY uk_order_source_record (order_source, source_record_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -281,6 +286,7 @@ CREATE TABLE IF NOT EXISTS customer (
     customer_type VARCHAR(32) NOT NULL DEFAULT 'DIRECT',
     customer_category VARCHAR(32) COMMENT '业务客户类别，例如留学生、地产客户、研究生',
     channel_id BIGINT,
+    owner_user_id BIGINT COMMENT 'JOINCOM内部负责人管理员ID',
     intended_plan VARCHAR(128),
     requirement_summary VARCHAR(512),
     current_status TINYINT NOT NULL DEFAULT 0
@@ -289,7 +295,8 @@ CREATE TABLE IF NOT EXISTS customer (
     source_customer_id VARCHAR(64),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_customer_source (source_system, source_customer_id)
+    UNIQUE KEY uk_customer_source (source_system, source_customer_id),
+    INDEX idx_customer_owner_user_id (owner_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS customer_channel_binding (
@@ -404,6 +411,7 @@ CREATE TABLE IF NOT EXISTS cmhk_reconciliation_row (
     iccid VARCHAR(32),
     phone VARCHAR(32),
     plan_name VARCHAR(128),
+    umall_status VARCHAR(64),
     review_status VARCHAR(32),
     supplement_status VARCHAR(128),
     activation_status VARCHAR(32),
@@ -558,4 +566,47 @@ CREATE TABLE IF NOT EXISTS customer_backup_import_row (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_customer_backup_row_import (import_id),
     INDEX idx_customer_backup_row_source (source_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_follow_up (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    customer_id BIGINT NOT NULL,
+    follow_up_type VARCHAR(32) NOT NULL COMMENT '跟进类型',
+    content VARCHAR(1000) NOT NULL COMMENT '跟进内容，不保存正式身份资料',
+    next_follow_up_at DATETIME,
+    operator_user_id BIGINT,
+    operator_name VARCHAR(64),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_customer_follow_up_customer (customer_id),
+    INDEX idx_customer_follow_up_next_time (next_follow_up_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS order_status_history (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
+    status_type VARCHAR(32) NOT NULL COMMENT 'JOINCOM、UMALL、UMALL_REVIEW、UMALL_SUPPLEMENT、ACTIVATION、CONTRACT',
+    before_status VARCHAR(32),
+    after_status VARCHAR(32) NOT NULL,
+    source_type VARCHAR(32) NOT NULL COMMENT 'ADMIN、H5、RECONCILIATION、MIGRATION、SYSTEM',
+    operator_user_id BIGINT,
+    operator_name VARCHAR(64),
+    remark VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_order_status_history_order (order_id),
+    INDEX idx_order_status_history_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS channel_product_policy (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    channel_id BIGINT NOT NULL,
+    plan_id BIGINT NOT NULL,
+    promotable TINYINT NOT NULL DEFAULT 1,
+    effective_from DATE,
+    effective_to DATE,
+    cashback_rule_ref VARCHAR(128),
+    commission_rule_ref VARCHAR(128),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_channel_product_policy (channel_id, plan_id),
+    INDEX idx_channel_product_policy_plan (plan_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,5 +1,5 @@
 package com.cmhk.business.module.admin.controller;
-import com.cmhk.business.common.ApiResponse; import com.cmhk.business.config.AdminAuthInterceptor; import com.cmhk.business.module.admin.security.AdminPrincipal; import com.cmhk.business.module.admin.service.AdminOrderService; import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
+import com.cmhk.business.common.ApiResponse; import com.cmhk.business.config.AdminAuthInterceptor; import com.cmhk.business.module.admin.security.AdminPrincipal; import com.cmhk.business.module.admin.service.AdminOrderService; import com.cmhk.business.module.mobile.entity.MobilePlanOrder; import com.cmhk.business.module.mobile.entity.OrderStatusHistory;
 import org.slf4j.Logger; import org.slf4j.LoggerFactory; import org.springframework.web.bind.annotation.*; import java.util.List;
 @RestController @RequestMapping("/api/admin/orders")
 public class AdminOrderController {
@@ -15,6 +15,9 @@ public class AdminOrderController {
  @GetMapping("/{id}")
  public ApiResponse<MobilePlanOrder> detail(@PathVariable Long id,@RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal){
        return ApiResponse.success(service.detail(id,principal));}
+ @GetMapping("/{id}/status-history")
+ public ApiResponse<List<OrderStatusHistory>> statusHistory(@PathVariable Long id,@RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal){
+       return ApiResponse.success(service.statusHistory(id,principal));}
  @PostMapping
  public ApiResponse<MobilePlanOrder> create(@RequestBody MobilePlanOrder input,@RequestAttribute(AdminAuthInterceptor.ADMIN_PRINCIPAL) AdminPrincipal principal){
        return ApiResponse.success(

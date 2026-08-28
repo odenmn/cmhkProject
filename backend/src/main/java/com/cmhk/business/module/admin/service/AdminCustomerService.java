@@ -8,11 +8,16 @@ import com.cmhk.business.module.admin.entity.SecondaryCommissionRecord;
 import com.cmhk.business.module.admin.mapper.IccidInventoryMapper;
 import com.cmhk.business.module.admin.mapper.ReconciliationRowMapper;
 import com.cmhk.business.module.admin.mapper.SecondaryCommissionRecordMapper;
+import com.cmhk.business.module.admin.entity.AdminUser;
+import com.cmhk.business.module.admin.dto.AdminOwnerOption;
+import com.cmhk.business.module.admin.mapper.AdminUserMapper;
 import com.cmhk.business.module.admin.security.AdminPrincipal;
 import com.cmhk.business.module.channel.entity.CustomerChannelBinding;
 import com.cmhk.business.module.customer.entity.Customer;
+import com.cmhk.business.module.customer.entity.CustomerFollowUp;
 import com.cmhk.business.module.customer.entity.CustomerStatusCode;
 import com.cmhk.business.module.customer.mapper.CustomerMapper;
+import com.cmhk.business.module.customer.mapper.CustomerFollowUpMapper;
 import com.cmhk.business.module.channel.entity.Channel;
 import com.cmhk.business.module.channel.mapper.ChannelMapper;
 import com.cmhk.business.module.channel.mapper.CustomerChannelBindingMapper;
@@ -43,6 +48,8 @@ public class AdminCustomerService {
     private final OperationLogService logService;
     private final ChannelMapper channelMapper;
     private final CustomerChannelBindingMapper bindingMapper;
+    private final CustomerFollowUpMapper followUpMapper;
+    private final AdminUserMapper adminUserMapper;
     private final CacheClient cacheClient;
     private final JavaType customerListType;
     private final JavaType channelListType;
@@ -52,6 +59,7 @@ public class AdminCustomerService {
                                 IccidInventoryMapper iccidMapper, ReconciliationRowMapper reconciliationRowMapper,
                                 SecondaryCommissionRecordMapper commissionRecordMapper, OperationLogService logService,
                                 ChannelMapper channelMapper, CustomerChannelBindingMapper bindingMapper,
+                                CustomerFollowUpMapper followUpMapper, AdminUserMapper adminUserMapper,
                                 CacheClient cacheClient, ObjectMapper objectMapper) {
         this.customerMapper = customerMapper;
         this.orderMapper = orderMapper;
@@ -61,6 +69,8 @@ public class AdminCustomerService {
         this.logService = logService;
         this.channelMapper = channelMapper;
         this.bindingMapper = bindingMapper;
+        this.followUpMapper = followUpMapper;
+        this.adminUserMapper = adminUserMapper;
         this.cacheClient = cacheClient;
         this.customerListType = objectMapper.getTypeFactory()
                 .constructCollectionType(List.class, Customer.class);
@@ -186,11 +196,62 @@ public class AdminCustomerService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("customer", customer);
         result.put("channel", customer.getChannelId() == null ? null : channelMapper.selectById(customer.getChannelId()));
+        result.put("owner", customer.getOwnerUserId() == null ? null : adminUserMapper.selectById(customer.getOwnerUserId()));
         result.put("orders", orders);
         result.put("iccids", iccids);
         result.put("reconciliationRows", rows);
         result.put("commissionRecords", commissions);
+        result.put("followUps", followUps(id));
         return result;
+    }
+
+    /** 返回可被选为客户负责人的内部启用用户。 */
+    public List<AdminOwnerOption> owners() {
+        return adminUserMapper.selectList(new LambdaQueryWrapper<AdminUser>()
+                .eq(AdminUser::getStatus, "ENABLED")
+                .in(AdminUser::getRoleCode, List.of("ADMIN", "OPERATOR"))
+                .orderByAsc(AdminUser::getDisplayName))
+                .stream()
+                .map(user -> new AdminOwnerOption(user.getId(), user.getUsername(), user.getDisplayName()))
+                .toList();
+    }
+
+    public List<CustomerFollowUp> followUps(Long customerId) {
+        return followUpMapper.selectList(new LambdaQueryWrapper<CustomerFollowUp>()
+                .eq(CustomerFollowUp::getCustomerId, customerId)
+                .orderByDesc(CustomerFollowUp::getCreatedAt)
+                .orderByDesc(CustomerFollowUp::getId));
+    }
+
+    /** 新增客户跟进时校验数据范围，并记录实际操作人。 */
+    @Transactional
+    public CustomerFollowUp addFollowUp(
+            Long customerId,
+            CustomerFollowUp input,
+            AdminPrincipal principal) {
+        Customer customer = required(customerId);
+        requireChannelAccess(customer.getChannelId(), principal);
+        if (input.getContent() == null || input.getContent().isBlank()) {
+            throw new IllegalArgumentException("跟进内容不能为空");
+        }
+        CustomerFollowUp target = new CustomerFollowUp();
+        target.setCustomerId(customerId);
+        target.setFollowUpType(input.getFollowUpType() == null ? "GENERAL" : input.getFollowUpType());
+        target.setContent(input.getContent().trim());
+        target.setNextFollowUpAt(input.getNextFollowUpAt());
+        target.setOperatorUserId(principal.userId());
+        target.setOperatorName(principal.username());
+        followUpMapper.insert(target);
+        logService.record(
+                principal.username(),
+                "CUSTOMER_FOLLOW_UP_CREATE",
+                "CUSTOMER",
+                customerId,
+                null,
+                Map.of("followUpId", target.getId()),
+                null);
+        cacheClient.invalidateNamespacesAfterCommit(AdminCacheKeys.CUSTOMERS);
+        return target;
     }
 
     @Transactional
@@ -204,6 +265,7 @@ public class AdminCustomerService {
         target.setCustomerCategory(input.getCustomerCategory());
         Channel selectedChannel = requireChannel(input.getChannelId());
         target.setChannelId(selectedChannel.getId());
+        target.setOwnerUserId(input.getOwnerUserId());
         target.setIntendedPlan(input.getIntendedPlan());
         target.setRequirementSummary(input.getRequirementSummary());
         target.setCurrentStatus(input.getCurrentStatus() == null ? CustomerStatusCode.PENDING : input.getCurrentStatus());
@@ -282,6 +344,7 @@ public class AdminCustomerService {
         copy.setName(source.getName()); copy.setContactMethod(source.getContactMethod()); copy.setCustomerType(source.getCustomerType());
         copy.setCustomerCategory(source.getCustomerCategory());
         copy.setChannelId(source.getChannelId()); copy.setIntendedPlan(source.getIntendedPlan());
+        copy.setOwnerUserId(source.getOwnerUserId());
         copy.setRequirementSummary(source.getRequirementSummary()); copy.setCurrentStatus(source.getCurrentStatus());
         copy.setSourceSystem(source.getSourceSystem()); copy.setSourceCustomerId(source.getSourceCustomerId());
         copy.setServiceNumber(source.getServiceNumber());

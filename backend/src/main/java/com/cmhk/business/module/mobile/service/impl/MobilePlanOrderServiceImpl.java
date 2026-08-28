@@ -6,10 +6,13 @@ import com.cmhk.business.module.customer.mapper.CustomerMapper;
 import com.cmhk.business.module.mobile.dto.MobilePlanOrderCreateRequest;
 import com.cmhk.business.module.mobile.entity.MobilePlan;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
+import com.cmhk.business.module.mobile.entity.OrderStatusCode;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
 import com.cmhk.business.module.mobile.service.MobilePlanOrderService;
 import com.cmhk.business.module.mobile.service.MobilePlanService;
+import com.cmhk.business.module.mobile.service.OrderStatusHistoryService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -17,18 +20,23 @@ import java.time.format.DateTimeFormatter;
 @Service
 public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMapper, MobilePlanOrder> implements MobilePlanOrderService {
 
-    private static final String STATUS_TRANSFER_TO_AGENT = "TRANSFER_TO_AGENT";
     private static final int CUSTOMER_IDENTITY_OVERSEAS_STUDENT = 1;
 
     private final MobilePlanService mobilePlanService;
     private final CustomerMapper customerMapper;
+    private final OrderStatusHistoryService historyService;
 
-    public MobilePlanOrderServiceImpl(MobilePlanService mobilePlanService, CustomerMapper customerMapper) {
+    public MobilePlanOrderServiceImpl(
+            MobilePlanService mobilePlanService,
+            CustomerMapper customerMapper,
+            OrderStatusHistoryService historyService) {
         this.mobilePlanService = mobilePlanService;
         this.customerMapper = customerMapper;
+        this.historyService = historyService;
     }
 
     @Override
+    @Transactional
     public MobilePlanOrder createTransferOrder(Long customerId, MobilePlanOrderCreateRequest request) {
         Customer customer = customerMapper.selectById(customerId);
         if (customer == null) {
@@ -72,8 +80,18 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
         order.setReferrerPhone(request.getReferrerPhone());
         order.setPreferredContactTime(request.getPreferredContactTime());
         order.setRemark(request.getRemark());
-        order.setStatus(STATUS_TRANSFER_TO_AGENT);
+        order.setStatus(OrderStatusCode.FOLLOWING.name());
+        order.setStatusUpdatedAt(LocalDateTime.now());
         save(order);
+        historyService.record(
+                order.getId(),
+                "JOINCOM",
+                null,
+                order.getStatus(),
+                "H5",
+                null,
+                null,
+                "客户提交办理并转人工");
         return order;
     }
 

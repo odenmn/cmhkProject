@@ -10,6 +10,7 @@ import com.cmhk.business.module.mobile.entity.MobilePlan;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
 import com.cmhk.business.module.mobile.service.MobilePlanService;
+import com.cmhk.business.module.mobile.service.OrderStatusHistoryService;
 import com.cmhk.business.module.mobile.service.impl.MobilePlanOrderServiceImpl;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -106,6 +107,7 @@ class MobilePlanOrderPrivacyTests {
         MobilePlanService mobilePlanService = mock(MobilePlanService.class);
         CustomerMapper customerMapper = mock(CustomerMapper.class);
         MobilePlanOrderMapper orderMapper = mock(MobilePlanOrderMapper.class);
+        OrderStatusHistoryService historyService = mock(OrderStatusHistoryService.class);
         LambdaQueryChainWrapper<MobilePlan> query = mock(LambdaQueryChainWrapper.class);
 
         Customer customer = new Customer();
@@ -122,7 +124,10 @@ class MobilePlanOrderPrivacyTests {
         when(query.one()).thenReturn(plan);
         when(orderMapper.insert(any(MobilePlanOrder.class))).thenReturn(1);
 
-        MobilePlanOrderServiceImpl service = new MobilePlanOrderServiceImpl(mobilePlanService, customerMapper);
+        MobilePlanOrderServiceImpl service = new MobilePlanOrderServiceImpl(
+                mobilePlanService,
+                customerMapper,
+                historyService);
         ReflectionTestUtils.setField(service, "baseMapper", orderMapper);
 
         MobilePlanOrderCreateRequest request = new MobilePlanOrderCreateRequest();

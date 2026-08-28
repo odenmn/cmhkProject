@@ -6,7 +6,10 @@ import com.cmhk.business.module.admin.security.AdminPrincipal;
 import com.cmhk.business.module.customer.entity.Customer;
 import com.cmhk.business.module.customer.mapper.CustomerMapper;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
+import com.cmhk.business.module.mobile.entity.OrderStatusCode;
+import com.cmhk.business.module.mobile.entity.OrderStatusHistory;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
+import com.cmhk.business.module.mobile.mapper.OrderStatusHistoryMapper;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -18,8 +21,31 @@ import java.math.BigDecimal; import java.time.Duration; import java.time.LocalDa
 public class AdminOrderService {
     private static final Duration CACHE_TTL = Duration.ofMinutes(5);
     private static final Duration EMPTY_CACHE_TTL = Duration.ofMinutes(1);
-    private final MobilePlanOrderMapper mapper; private final CustomerMapper customerMapper; private final OperationLogService logService; private final CacheClient cacheClient; private final JavaType orderListType; private final JavaType orderType;
-    public AdminOrderService(MobilePlanOrderMapper mapper, CustomerMapper customerMapper, OperationLogService logService, CacheClient cacheClient, ObjectMapper objectMapper) { this.mapper=mapper; this.customerMapper=customerMapper; this.logService=logService; this.cacheClient=cacheClient; this.orderListType=objectMapper.getTypeFactory().constructCollectionType(List.class,MobilePlanOrder.class); this.orderType=objectMapper.getTypeFactory().constructType(MobilePlanOrder.class); }
+    private final MobilePlanOrderMapper mapper;
+    private final CustomerMapper customerMapper;
+    private final OperationLogService logService;
+    private final CacheClient cacheClient;
+    private final OrderStatusHistoryMapper historyMapper;
+    private final JavaType orderListType;
+    private final JavaType orderType;
+
+    public AdminOrderService(
+            MobilePlanOrderMapper mapper,
+            CustomerMapper customerMapper,
+            OperationLogService logService,
+            CacheClient cacheClient,
+            OrderStatusHistoryMapper historyMapper,
+            ObjectMapper objectMapper) {
+        this.mapper = mapper;
+        this.customerMapper = customerMapper;
+        this.logService = logService;
+        this.cacheClient = cacheClient;
+        this.historyMapper = historyMapper;
+        this.orderListType = objectMapper.getTypeFactory()
+                .constructCollectionType(List.class, MobilePlanOrder.class);
+        this.orderType = objectMapper.getTypeFactory()
+                .constructType(MobilePlanOrder.class);
+    }
 
     public List<MobilePlanOrder> list(String keyword, String status, Long customerId) {
         String key=cacheClient.versionedKey(AdminCacheKeys.ORDERS,"list:"+AdminCacheKeys.discriminator(keyword,status,customerId));
@@ -70,7 +96,7 @@ public class AdminOrderService {
         target.setCustomerId(input.getCustomerId()); target.setCustomerName(input.getCustomerName()); target.setContactPhone(required(input.getContactPhone(),"联系电话不能为空"));
         target.setPlanId(input.getPlanId()); target.setPlanCode(required(input.getPlanCode(),"套餐编码不能为空")); target.setPlanName(required(input.getPlanName(),"套餐名称不能为空"));
         target.setPlanType(input.getPlanType()); target.setMonthlyFee(input.getMonthlyFee()==null? BigDecimal.ZERO:input.getMonthlyFee()); target.setContractPeriod(input.getContractPeriod());
-        target.setUmallOrderNo(input.getUmallOrderNo()); target.setServiceNumber(input.getServiceNumber()); target.setActivationStatus(input.getActivationStatus()); target.setContractStatus(input.getContractStatus());
+        target.setUmallOrderNo(input.getUmallOrderNo()); target.setServiceNumber(input.getServiceNumber()); target.setUmallStatus(input.getUmallStatus()); target.setReviewStatus(input.getReviewStatus()); target.setSupplementStatus(input.getSupplementStatus()); target.setActivationStatus(input.getActivationStatus()); target.setContractStatus(input.getContractStatus());
         target.setOrderSource(input.getOrderSource()==null?"ADMIN":input.getOrderSource()); target.setStatus(input.getStatus()==null?"待处理":input.getStatus());
         target.setReconciliationStatus(input.getReconciliationStatus()==null?"待对账":input.getReconciliationStatus());
         if(id==null){ target.setOrderNo("ADM"+ LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))+ThreadLocalRandom.current().nextInt(100,1000)); mapper.insert(target); }
@@ -82,10 +108,65 @@ public class AdminOrderService {
     @Transactional
     public MobilePlanOrder save(Long id, MobilePlanOrder input, AdminPrincipal principal) {
         requireCustomerAccess(input.getCustomerId(), principal);
-        if (id != null) {
-            requireCustomerAccess(required(id).getCustomerId(), principal);
+        MobilePlanOrder before = id == null ? null : required(id);
+        if (before != null) {
+            requireCustomerAccess(before.getCustomerId(), principal);
         }
-        return save(id, input, principal.username());
+        String targetStatus = input.getStatus() == null || input.getStatus().isBlank()
+                ? OrderStatusCode.PENDING.name()
+                : input.getStatus().trim();
+        if (!OrderStatusCode.isSupported(targetStatus)) {
+            throw new IllegalArgumentException("办理状态不在允许范围内");
+        }
+        input.setStatus(targetStatus);
+        MobilePlanOrder saved = save(id, input, principal.username());
+        if (before == null || !targetStatus.equals(before.getStatus())) {
+            saved.setStatusUpdatedAt(LocalDateTime.now());
+            mapper.updateById(saved);
+            recordStatusHistory(before, saved, principal);
+        }
+        recordFieldHistory(saved.getId(), "UMALL", before == null ? null : before.getUmallStatus(), saved.getUmallStatus(), principal);
+        recordFieldHistory(saved.getId(), "UMALL_REVIEW", before == null ? null : before.getReviewStatus(), saved.getReviewStatus(), principal);
+        recordFieldHistory(saved.getId(), "UMALL_SUPPLEMENT", before == null ? null : before.getSupplementStatus(), saved.getSupplementStatus(), principal);
+        recordFieldHistory(saved.getId(), "ACTIVATION", before == null ? null : before.getActivationStatus(), saved.getActivationStatus(), principal);
+        recordFieldHistory(saved.getId(), "CONTRACT", before == null ? null : before.getContractStatus(), saved.getContractStatus(), principal);
+        return saved;
+    }
+
+    /** 记录统一办理状态变化，不回写历史记录。 */
+    private void recordStatusHistory(
+            MobilePlanOrder before,
+            MobilePlanOrder saved,
+            AdminPrincipal principal) {
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrderId(saved.getId());
+        history.setStatusType("JOINCOM");
+        history.setBeforeStatus(before == null ? null : before.getStatus());
+        history.setAfterStatus(saved.getStatus());
+        history.setSourceType("ADMIN");
+        history.setOperatorUserId(principal.userId());
+        history.setOperatorName(principal.username());
+        historyMapper.insert(history);
+    }
+
+    private void recordFieldHistory(
+            Long orderId,
+            String statusType,
+            String beforeStatus,
+            String afterStatus,
+            AdminPrincipal principal) {
+        if (afterStatus == null || afterStatus.equals(beforeStatus)) {
+            return;
+        }
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrderId(orderId);
+        history.setStatusType(statusType);
+        history.setBeforeStatus(beforeStatus);
+        history.setAfterStatus(afterStatus);
+        history.setSourceType("ADMIN");
+        history.setOperatorUserId(principal.userId());
+        history.setOperatorName(principal.username());
+        historyMapper.insert(history);
     }
 
     public MobilePlanOrder detail(Long id){String key=cacheClient.versionedKey(AdminCacheKeys.ORDERS,"detail:"+id);return cacheClient.queryWithMutex(key,orderType,()->required(id),CACHE_TTL,EMPTY_CACHE_TTL);}
@@ -93,6 +174,16 @@ public class AdminOrderService {
         MobilePlanOrder order = detail(id);
         requireCustomerAccess(order.getCustomerId(), principal);
         return order;
+    }
+
+    /** 查询订单完整状态历史，并复用订单的数据范围校验。 */
+    public List<OrderStatusHistory> statusHistory(Long id, AdminPrincipal principal) {
+        MobilePlanOrder order = required(id);
+        requireCustomerAccess(order.getCustomerId(), principal);
+        return historyMapper.selectList(new LambdaQueryWrapper<OrderStatusHistory>()
+                .eq(OrderStatusHistory::getOrderId, id)
+                .orderByDesc(OrderStatusHistory::getCreatedAt)
+                .orderByDesc(OrderStatusHistory::getId));
     }
 
     private void requireCustomerAccess(Long customerId, AdminPrincipal principal) {

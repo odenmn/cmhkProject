@@ -18,6 +18,7 @@ public class ReconciliationRow {
     private String iccid;
     private String phone;
     private String planName;
+    private String umallStatus;
     private String reviewStatus;
     private String supplementStatus;
     private String activationStatus;

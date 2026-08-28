@@ -37,6 +37,9 @@ public class AdminPermissionPolicy {
         if (path.startsWith("/api/admin/users")) {
             return true;
         }
+        if (path.startsWith("/api/admin/products") && !HttpMethod.GET.matches(method)) {
+            return true;
+        }
         if (path.startsWith("/api/admin/channels") && !HttpMethod.GET.matches(method)) {
             return true;
         }

@@ -81,6 +81,10 @@ public class MobilePlanOrder {
 
     private String status;
 
+    private String reviewStatus;
+
+    private String supplementStatus;
+
     private String umallOrderNo;
 
     private String serviceNumber;
@@ -98,6 +102,8 @@ public class MobilePlanOrder {
     private String sourceChannelName;
 
     private String umallStatus;
+
+    private LocalDateTime statusUpdatedAt;
 
     private LocalDate onboardDate;
 

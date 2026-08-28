@@ -20,6 +20,8 @@ public class Customer {
     private String customerType;
     private String customerCategory;
     private Long channelId;
+
+    private Long ownerUserId;
     private String intendedPlan;
     private String requirementSummary;
     private Integer currentStatus;
