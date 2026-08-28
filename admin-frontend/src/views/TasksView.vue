@@ -3,13 +3,15 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../api/admin'
 import { session } from '../api/http'
+import { useRoute } from 'vue-router'
 
 const rows = ref<any[]>([])
 const owners = ref<any[]>([])
 const detail = ref<any>()
 const loading = ref(false)
 const detailVisible = ref(false)
-const filters = reactive({ taskStatus: '', taskType: '', keyword: '' })
+const route = useRoute()
+const filters = reactive({ taskStatus: String(route.query.taskStatus || ''), taskType: String(route.query.taskType || ''), keyword: '' })
 const statusLabels: Record<string, string> = { PENDING: '待处理', PROCESSING: '处理中', DONE: '已完成', CLOSED: '已关闭' }
 const typeLabels: Record<string, string> = { CUSTOMER_FOLLOW_UP: '客户跟进', SUPPLEMENT: '补件', REVIEW_EXCEPTION: '审核异常', ACTIVATION_EXCEPTION: '激活异常', RESOURCE_SHORTAGE: '资源不足', RECONCILIATION_MATCH_EXCEPTION: '对账匹配异常', CASHBACK_EXCEPTION: '返现异常', AFTER_SALES: '售后' }
 const current = session()

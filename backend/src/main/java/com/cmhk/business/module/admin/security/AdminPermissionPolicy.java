@@ -27,6 +27,7 @@ public class AdminPermissionPolicy {
             return true;
         }
         return path.startsWith("/api/admin/customers")
+                || path.startsWith("/api/admin/analytics")
                 || path.startsWith("/api/admin/orders")
                 || path.startsWith("/api/admin/channels")
                 || path.startsWith("/api/admin/secondary/records")

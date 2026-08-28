@@ -1,6 +1,6 @@
 import http from './http'
 export const api={
- login:(data:any)=>http.post('/auth/login',data),dashboard:()=>http.get('/dashboard'),logs:(params?:any)=>http.get('/logs',{params}),
+ login:(data:any)=>http.post('/auth/login',data),dashboard:()=>http.get('/dashboard'),analytics:(params?:any)=>http.get('/analytics',{params}),logs:(params?:any)=>http.get('/logs',{params}),
  users:()=>http.get('/users'),createUser:(d:any)=>http.post('/users',d),updateUser:(id:number,d:any)=>http.put(`/users/${id}`,d),changeUserPassword:(id:number,password:string)=>http.post(`/users/${id}/password`,{password}),changeUserStatus:(id:number,status:string)=>http.post(`/users/${id}/status`,{status}),
  customers:(params?:any)=>http.get('/customers',{params}),customerChannels:()=>http.get('/customers/channels'),customerOwners:()=>http.get('/customers/owners'),customer:(id:number)=>http.get(`/customers/${id}`),createCustomer:(d:any)=>http.post('/customers',d),updateCustomer:(id:number,d:any)=>http.put(`/customers/${id}`,d),customerFollowUps:(id:number)=>http.get(`/customers/${id}/follow-ups`),addCustomerFollowUp:(id:number,d:any)=>http.post(`/customers/${id}/follow-ups`,d),
  orders:(params?:any)=>http.get('/orders',{params}),order:(id:number)=>http.get(`/orders/${id}`),orderStatusHistory:(id:number)=>http.get(`/orders/${id}/status-history`),orderTasks:(id:number)=>http.get(`/orders/${id}/tasks`),createOrder:(d:any)=>http.post('/orders',d),updateOrder:(id:number,d:any)=>http.put(`/orders/${id}`,d),

@@ -47,6 +47,7 @@ class AdminPermissionPolicyTests {
         assertTrue(policy.isAllowed(channelOperator, "GET", "/api/admin/orders"));
         assertTrue(policy.isAllowed(channelOperator, "GET", "/api/admin/secondary/records"));
         assertTrue(policy.isAllowed(channelOperator, "GET", "/api/admin/secondary/rules"));
+        assertTrue(policy.isAllowed(channelOperator, "GET", "/api/admin/analytics"));
         assertFalse(policy.isAllowed(channelOperator, "GET", "/api/admin/dashboard"));
         assertFalse(policy.isAllowed(channelOperator, "GET", "/api/admin/iccids"));
         assertFalse(policy.isAllowed(channelOperator, "GET", "/api/admin/referral-numbers/chains"));

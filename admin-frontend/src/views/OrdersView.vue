@@ -2,9 +2,11 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../api/admin'
+import { useRoute } from 'vue-router'
 
 const statusOptions = [{value:'PENDING',label:'待处理'},{value:'FOLLOWING',label:'跟进中'},{value:'SUBMITTED_UMALL',label:'已提交UMALL'},{value:'UNDER_REVIEW',label:'审核中'},{value:'NEED_SUPPLEMENT',label:'待补件'},{value:'WAITING_ACTIVATION',label:'待激活'},{value:'ACTIVATED',label:'已激活'},{value:'COMPLETED',label:'已完成'},{value:'AFTER_SALES',label:'售后中'},{value:'CANCELLED',label:'已取消'}]
 const statusLabels = Object.fromEntries(statusOptions.map(item => [item.value, item.label]))
+const route = useRoute()
 const reviewStatusOptions = [{value:'待审核',label:'待审核'},{value:'审核中',label:'审核中'},{value:'审核通过',label:'审核通过'},{value:'审核拒绝',label:'审核拒绝'},{value:'审核失败',label:'审核失败'}]
 const supplementStatusOptions = [{value:'无需补件',label:'无需补件'},{value:'待补件',label:'待补件'},{value:'补件中',label:'补件中'},{value:'已补件',label:'已补件'}]
 const activationStatusOptions = [{value:'待激活',label:'待激活'},{value:'已激活',label:'已激活'},{value:'激活失败',label:'激活失败'},{value:'激活异常',label:'激活异常'}]
@@ -20,7 +22,7 @@ const taskRows = ref<any[]>([])
 const cashbackVisible = ref(false)
 const cashbackRows = ref<any[]>([])
 const editing = ref<any>()
-const filters = reactive<any>({ keyword: '', status: '', customerId: null })
+const filters = reactive<any>({ keyword: '', status: String(route.query.status || ''), customerId: null })
 const empty = () => ({ customerId: null, customerName: '', contactPhone: '', planId: null, planCode: '', planName: '', planType: '', monthlyFee: 0, contractPeriod: '', umallOrderNo: '', serviceNumber: '', reviewStatus: '', supplementStatus: '', activationStatus: '', activatedAt: null, contractStatus: '', umallStatus: '', orderSource: 'ADMIN', status: 'PENDING', reconciliationStatus: '待对账' })
 const form = reactive<any>(empty())
 
