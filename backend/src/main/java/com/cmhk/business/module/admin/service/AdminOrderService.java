@@ -8,8 +8,11 @@ import com.cmhk.business.module.customer.mapper.CustomerMapper;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
 import com.cmhk.business.module.mobile.entity.OrderStatusCode;
 import com.cmhk.business.module.mobile.entity.OrderStatusHistory;
+import com.cmhk.business.module.mobile.entity.MobilePlan;
+import com.cmhk.business.module.mobile.mapper.MobilePlanMapper;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
 import com.cmhk.business.module.mobile.mapper.OrderStatusHistoryMapper;
+import com.cmhk.business.module.task.service.OperationTaskService;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,8 @@ public class AdminOrderService {
     private final OperationLogService logService;
     private final CacheClient cacheClient;
     private final OrderStatusHistoryMapper historyMapper;
+    private final MobilePlanMapper planMapper;
+    private final OperationTaskService taskService;
     private final JavaType orderListType;
     private final JavaType orderType;
 
@@ -35,12 +40,16 @@ public class AdminOrderService {
             OperationLogService logService,
             CacheClient cacheClient,
             OrderStatusHistoryMapper historyMapper,
+            MobilePlanMapper planMapper,
+            OperationTaskService taskService,
             ObjectMapper objectMapper) {
         this.mapper = mapper;
         this.customerMapper = customerMapper;
         this.logService = logService;
         this.cacheClient = cacheClient;
         this.historyMapper = historyMapper;
+        this.planMapper = planMapper;
+        this.taskService = taskService;
         this.orderListType = objectMapper.getTypeFactory()
                 .constructCollectionType(List.class, MobilePlanOrder.class);
         this.orderType = objectMapper.getTypeFactory()
@@ -93,9 +102,13 @@ public class AdminOrderService {
     @Transactional public MobilePlanOrder save(Long id, MobilePlanOrder input, String operator) {
         MobilePlanOrder before=id==null?null:required(id); MobilePlanOrder target=new MobilePlanOrder(); if(before!=null)BeanUtils.copyProperties(before,target);
         if (input.getCustomerId()==null || customerMapper.selectById(input.getCustomerId())==null) throw new IllegalArgumentException("请选择有效客户");
-        target.setCustomerId(input.getCustomerId()); target.setCustomerName(input.getCustomerName()); target.setContactPhone(required(input.getContactPhone(),"联系电话不能为空"));
-        target.setPlanId(input.getPlanId()); target.setPlanCode(required(input.getPlanCode(),"套餐编码不能为空")); target.setPlanName(required(input.getPlanName(),"套餐名称不能为空"));
-        target.setPlanType(input.getPlanType()); target.setMonthlyFee(input.getMonthlyFee()==null? BigDecimal.ZERO:input.getMonthlyFee()); target.setContractPeriod(input.getContractPeriod());
+        MobilePlan plan = requiredPlan(input.getPlanId(), before);
+        target.setCustomerId(input.getCustomerId()); target.setCustomerName(input.getCustomerName());
+        if (input.getContactPhone() != null && !input.getContactPhone().isBlank()) {
+            target.setContactPhone(input.getContactPhone().trim());
+        }
+        target.setPlanId(plan.getId()); target.setPlanCode(plan.getPlanCode()); target.setPlanName(plan.getPlanName());
+        target.setPlanType(plan.getPlanType()); target.setMonthlyFee(plan.getMonthlyFee() == null ? BigDecimal.ZERO : plan.getMonthlyFee()); target.setContractPeriod(plan.getContractPeriod());
         target.setUmallOrderNo(input.getUmallOrderNo()); target.setServiceNumber(input.getServiceNumber()); target.setUmallStatus(input.getUmallStatus()); target.setReviewStatus(input.getReviewStatus()); target.setSupplementStatus(input.getSupplementStatus()); target.setActivationStatus(input.getActivationStatus()); target.setContractStatus(input.getContractStatus());
         target.setOrderSource(input.getOrderSource()==null?"ADMIN":input.getOrderSource()); target.setStatus(input.getStatus()==null?"待处理":input.getStatus());
         target.setReconciliationStatus(input.getReconciliationStatus()==null?"待对账":input.getReconciliationStatus());
@@ -130,6 +143,7 @@ public class AdminOrderService {
         recordFieldHistory(saved.getId(), "UMALL_SUPPLEMENT", before == null ? null : before.getSupplementStatus(), saved.getSupplementStatus(), principal);
         recordFieldHistory(saved.getId(), "ACTIVATION", before == null ? null : before.getActivationStatus(), saved.getActivationStatus(), principal);
         recordFieldHistory(saved.getId(), "CONTRACT", before == null ? null : before.getContractStatus(), saved.getContractStatus(), principal);
+        taskService.ensureTasksForOrderStatus(before, saved, principal);
         return saved;
     }
 
@@ -198,5 +212,14 @@ public class AdminOrderService {
         }
     }
     public MobilePlanOrder required(Long id){MobilePlanOrder o=mapper.selectById(id);if(o==null)throw new IllegalArgumentException("订单不存在");return o;}
+    /** 订单套餐只允许引用启用套餐；历史订单可保留原已停用套餐以便修正其他字段。 */
+    private MobilePlan requiredPlan(Long planId, MobilePlanOrder before) {
+        MobilePlan plan = planId == null ? null : planMapper.selectById(planId);
+        boolean retainsHistoricalPlan = before != null && plan != null && plan.getId().equals(before.getPlanId());
+        if (plan == null || (!Integer.valueOf(1).equals(plan.getEnabled()) && !retainsHistoricalPlan)) {
+            throw new IllegalArgumentException("请选择已启用的套餐");
+        }
+        return plan;
+    }
     private String required(String v,String m){if(v==null||v.isBlank())throw new IllegalArgumentException(m);return v.trim();}
 }

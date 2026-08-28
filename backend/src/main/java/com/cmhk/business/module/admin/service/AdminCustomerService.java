@@ -25,6 +25,8 @@ import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
 import com.cmhk.business.module.resource.entity.ReferralNumber;
 import com.cmhk.business.module.resource.mapper.ReferralNumberMapper;
+import com.cmhk.business.module.task.entity.OperationTask;
+import com.cmhk.business.module.task.mapper.OperationTaskMapper;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -48,6 +50,7 @@ public class AdminCustomerService {
     private final ReferralNumberMapper referralNumberMapper;
     private final ReconciliationRowMapper reconciliationRowMapper;
     private final SecondaryCommissionRecordMapper commissionRecordMapper;
+    private final OperationTaskMapper taskMapper;
     private final OperationLogService logService;
     private final ChannelMapper channelMapper;
     private final CustomerChannelBindingMapper bindingMapper;
@@ -62,6 +65,7 @@ public class AdminCustomerService {
                                 IccidInventoryMapper iccidMapper, ReferralNumberMapper referralNumberMapper,
                                 ReconciliationRowMapper reconciliationRowMapper,
                                 SecondaryCommissionRecordMapper commissionRecordMapper, OperationLogService logService,
+                                OperationTaskMapper taskMapper,
                                 ChannelMapper channelMapper, CustomerChannelBindingMapper bindingMapper,
                                 CustomerFollowUpMapper followUpMapper, AdminUserMapper adminUserMapper,
                                 CacheClient cacheClient, ObjectMapper objectMapper) {
@@ -71,6 +75,7 @@ public class AdminCustomerService {
         this.referralNumberMapper = referralNumberMapper;
         this.reconciliationRowMapper = reconciliationRowMapper;
         this.commissionRecordMapper = commissionRecordMapper;
+        this.taskMapper = taskMapper;
         this.logService = logService;
         this.channelMapper = channelMapper;
         this.bindingMapper = bindingMapper;
@@ -213,6 +218,9 @@ public class AdminCustomerService {
                 .orderByDesc(ReferralNumber::getId)));
         result.put("reconciliationRows", rows);
         result.put("commissionRecords", commissions);
+        result.put("tasks", taskMapper.selectList(new LambdaQueryWrapper<OperationTask>()
+                .eq(OperationTask::getCustomerId, id)
+                .orderByDesc(OperationTask::getCreatedAt)));
         result.put("followUps", followUps(id));
         return result;
     }

@@ -506,6 +506,57 @@ CREATE TABLE IF NOT EXISTS operation_log (
     INDEX idx_operation_log_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS operation_task (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_no VARCHAR(32) NOT NULL,
+    task_type VARCHAR(40) NOT NULL COMMENT '任务类型',
+    title VARCHAR(255) NOT NULL,
+    task_status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/PROCESSING/DONE/CLOSED',
+    priority VARCHAR(16) NOT NULL DEFAULT 'NORMAL' COMMENT 'LOW/NORMAL/HIGH/URGENT',
+    customer_id BIGINT,
+    order_id BIGINT,
+    channel_id BIGINT,
+    source_type VARCHAR(40) NOT NULL,
+    source_record_id VARCHAR(64) NOT NULL,
+    dedup_key VARCHAR(180) NOT NULL,
+    open_dedup_key VARCHAR(180),
+    assignee_user_id BIGINT,
+    assignee_name VARCHAR(64),
+    due_at DATETIME,
+    handling_result VARCHAR(1000),
+    created_by_user_id BIGINT,
+    created_by_name VARCHAR(64),
+    claimed_at DATETIME,
+    completed_at DATETIME,
+    closed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_operation_task_no (task_no),
+    UNIQUE KEY uk_operation_task_open_dedup (open_dedup_key),
+    INDEX idx_operation_task_status_assignee (task_status, assignee_user_id),
+    INDEX idx_operation_task_type_source (task_type, source_type, source_record_id),
+    INDEX idx_operation_task_customer (customer_id),
+    INDEX idx_operation_task_order (order_id),
+    INDEX idx_operation_task_channel (channel_id),
+    INDEX idx_operation_task_due_at (due_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS operation_task_history (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT NOT NULL,
+    action_type VARCHAR(24) NOT NULL COMMENT 'CREATE/CLAIM/REASSIGN/PROCESS/COMPLETE/CLOSE',
+    before_status VARCHAR(16),
+    after_status VARCHAR(16) NOT NULL,
+    before_assignee_user_id BIGINT,
+    after_assignee_user_id BIGINT,
+    operator_user_id BIGINT,
+    operator_name VARCHAR(64) NOT NULL,
+    remark VARCHAR(1000),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_operation_task_history_task (task_id, created_at),
+    INDEX idx_operation_task_history_operator (operator_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS channel_legacy_mapping (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     legacy_table VARCHAR(64) NOT NULL,

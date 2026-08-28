@@ -28,3 +28,5 @@ P1已于2026-08-27执行`V001__unify_channels_and_admin_permissions.sql`，统�
 P2已执行`V002__standardize_customers_orders_and_products.sql`，标准化客户、订单和产品外围结构。
 
 P3使用`V003__resource_pool_and_referral_chains.sql`新增多接龙推荐号码表，并为既有 ICCID 当前绑定补充迁移基线历史；脚本不会自动推断历史接龙关系。
+
+P4使用`V004__operation_tasks.sql`新增运营任务和任务处理历史表；任务只记录内部处理动作，不回写 UMALL、客户、订单或资源外部事实状态。

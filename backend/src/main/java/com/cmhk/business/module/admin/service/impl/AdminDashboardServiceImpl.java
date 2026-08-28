@@ -12,6 +12,8 @@ import com.cmhk.business.module.admin.service.AdminDashboardService;
 import com.cmhk.business.module.admin.service.AdminCacheKeys;
 import com.cmhk.business.module.customer.mapper.CustomerMapper;
 import com.cmhk.business.module.mobile.mapper.MobilePlanOrderMapper;
+import com.cmhk.business.module.task.entity.OperationTask;
+import com.cmhk.business.module.task.mapper.OperationTaskMapper;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     private final IccidInventoryMapper iccidMapper;
     private final ReconciliationRowMapper reconciliationRowMapper;
     private final SecondaryCommissionRecordMapper commissionRecordMapper;
+    private final OperationTaskMapper taskMapper;
     private final CacheClient cacheClient;
     private final JavaType metricsType;
 
@@ -39,6 +42,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     public AdminDashboardServiceImpl(CustomerMapper customerMapper, MobilePlanOrderMapper orderMapper,
                                      IccidInventoryMapper iccidMapper, ReconciliationRowMapper reconciliationRowMapper,
                                      SecondaryCommissionRecordMapper commissionRecordMapper,
+                                     OperationTaskMapper taskMapper,
                                      CacheClient cacheClient,
                                      ObjectMapper objectMapper) {
         this.customerMapper = customerMapper;
@@ -46,6 +50,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         this.iccidMapper = iccidMapper;
         this.reconciliationRowMapper = reconciliationRowMapper;
         this.commissionRecordMapper = commissionRecordMapper;
+        this.taskMapper = taskMapper;
         this.cacheClient = cacheClient;
         this.metricsType = objectMapper.getTypeFactory()
                 .constructMapType(LinkedHashMap.class, String.class, Long.class);
@@ -75,6 +80,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 new LambdaQueryWrapper<ReconciliationRow>().in(ReconciliationRow::getMatchStatus, List.of("UNMATCHED", "AMBIGUOUS"))));
         metrics.put("pendingSettlements", commissionRecordMapper.selectCount(
                 new LambdaQueryWrapper<SecondaryCommissionRecord>().eq(SecondaryCommissionRecord::getStatus, "PENDING")));
+        metrics.put("pendingTasks", taskMapper.selectCount(new LambdaQueryWrapper<OperationTask>()
+                .in(OperationTask::getTaskStatus, List.of("PENDING", "PROCESSING"))));
         return metrics;
     }
 
