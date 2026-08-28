@@ -1,6 +1,7 @@
 package com.cmhk.business.module.mobile.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cmhk.business.module.cashback.service.CashbackService;
 import com.cmhk.business.module.customer.entity.Customer;
 import com.cmhk.business.module.customer.mapper.CustomerMapper;
 import com.cmhk.business.module.mobile.dto.MobilePlanOrderCreateRequest;
@@ -25,14 +26,17 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
     private final MobilePlanService mobilePlanService;
     private final CustomerMapper customerMapper;
     private final OrderStatusHistoryService historyService;
+    private final CashbackService cashbackService;
 
     public MobilePlanOrderServiceImpl(
             MobilePlanService mobilePlanService,
             CustomerMapper customerMapper,
-            OrderStatusHistoryService historyService) {
+            OrderStatusHistoryService historyService,
+            CashbackService cashbackService) {
         this.mobilePlanService = mobilePlanService;
         this.customerMapper = customerMapper;
         this.historyService = historyService;
+        this.cashbackService = cashbackService;
     }
 
     @Override
@@ -92,6 +96,7 @@ public class MobilePlanOrderServiceImpl extends ServiceImpl<MobilePlanOrderMappe
                 null,
                 null,
                 "客户提交办理并转人工");
+        cashbackService.ensurePlanForOrder(order, null);
         return order;
     }
 

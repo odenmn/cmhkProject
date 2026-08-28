@@ -7,6 +7,7 @@ import { api } from '../api/admin'
 const route = useRoute()
 const router = useRouter()
 const data = ref<any>()
+const cashbackRows = ref<any[]>([])
 const followUpForm = reactive<any>({ followUpType: 'GENERAL', content: '', nextFollowUpAt: null })
 const savingFollowUp = ref(false)
 const statusLabels: Record<number, string> = { 0: '待处理', 1: '跟进中', 2: '待资料', 3: '办理中', 4: '待激活', 5: '已激活', 6: '已完成', 9: '无效' }
@@ -31,6 +32,7 @@ async function addFollowUp() {
 onMounted(async () => {
   try {
     data.value = await api.customer(Number(route.params.id))
+    cashbackRows.value = await api.cashbackPlans({ customerId: Number(route.params.id) }) as any[]
   } catch (error: any) {
     ElMessage.error(error.message)
   }
@@ -63,5 +65,6 @@ onMounted(async () => {
     <div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">ICCID 配对</span></div><el-table :data="data.iccids"><el-table-column prop="iccid" label="ICCID" /><el-table-column prop="status" label="状态" /><el-table-column prop="currentOrderId" label="订单ID" /><el-table-column prop="assignedAt" label="分配时间" /></el-table></div>
     <div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">推荐号码接龙</span><span class="table-meta">{{ data.referralNumbers?.length || 0 }} 条</span></div><el-table :data="data.referralNumbers"><el-table-column prop="referralNumber" label="推荐号码" min-width="140" /><el-table-column prop="status" label="状态" width="120" /><el-table-column prop="chainId" label="接龙ID" width="100" /><el-table-column prop="assignedOrderId" label="占用订单ID" min-width="130" /><el-table-column prop="sourceOrderId" label="来源订单ID" min-width="130" /><el-table-column prop="reservedAt" label="占用时间" min-width="180" /><el-table-column prop="usedAt" label="使用时间" min-width="180" /></el-table></div>
     <div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">对账与渠道结算</span></div><el-table :data="data.reconciliationRows"><el-table-column prop="umallOrderNo" label="UMALL订单号" /><el-table-column prop="matchMethod" label="匹配方式" /><el-table-column prop="matchStatus" label="匹配状态" /><el-table-column prop="activationStatus" label="激活状态" /><el-table-column prop="contractStatus" label="合约状态" /></el-table><el-table :data="data.commissionRecords" style="border-top: 1px solid #eee"><el-table-column prop="channelId" label="二级渠道ID" /><el-table-column prop="channelPayable" label="渠道应结" /><el-table-column prop="finalAmount" label="最终金额" /><el-table-column prop="status" label="结算状态" /></el-table></div>
+    <div class="table-card section-gap"><div class="table-toolbar"><span class="table-title">客户返现</span><span class="table-meta">{{ cashbackRows.length }} 个计划</span></div><el-table :data="cashbackRows"><el-table-column prop="cashbackPlan.planNo" label="计划编号" min-width="130" /><el-table-column label="关联订单" min-width="160"><template #default="scope">{{ scope.row.order?.orderNo || scope.row.cashbackPlan.orderId }}</template></el-table-column><el-table-column prop="cashbackPlan.activatedAt" label="实际激活时间" min-width="170" /><el-table-column prop="cashbackPlan.installmentCount" label="期数" width="80" /><el-table-column prop="cashbackPlan.totalAmount" label="计划总额" width="120" /><el-table-column prop="cashbackPlan.status" label="状态" width="100" /></el-table></div>
   </div>
 </template>

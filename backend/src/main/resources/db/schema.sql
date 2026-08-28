@@ -229,6 +229,7 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     source_channel_name VARCHAR(128),
     umall_status VARCHAR(32),
     status_updated_at DATETIME COMMENT '统一办理状态最近更新时间',
+    activated_at DATETIME COMMENT '实际激活时间，返现期次从该日满一个月起计算',
     onboard_date DATE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -238,6 +239,7 @@ CREATE TABLE IF NOT EXISTS mobile_plan_order (
     INDEX idx_mobile_plan_order_status (status),
     INDEX idx_mobile_plan_order_review_status (review_status),
     INDEX idx_mobile_plan_order_status_updated_at (status_updated_at),
+    INDEX idx_mobile_plan_order_activated_at (activated_at),
     UNIQUE KEY uk_order_source_record (order_source, source_record_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -490,6 +492,62 @@ CREATE TABLE IF NOT EXISTS secondary_commission_record (
     UNIQUE KEY uk_secondary_commission_order (order_id),
     INDEX idx_secondary_commission_channel (channel_id),
     INDEX idx_secondary_commission_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_cashback_rule (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    rule_name VARCHAR(128) NOT NULL,
+    plan_id BIGINT NOT NULL,
+    contract_months INT NOT NULL,
+    installment_amount DECIMAL(12, 2) NOT NULL,
+    effective_from DATE,
+    effective_to DATE,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_cashback_rule_plan_contract (plan_id, contract_months),
+    INDEX idx_cashback_rule_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_cashback_plan (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    plan_no VARCHAR(32) NOT NULL,
+    customer_id BIGINT NOT NULL,
+    order_id BIGINT NOT NULL,
+    channel_id BIGINT,
+    cashback_rule_id BIGINT NOT NULL,
+    rule_snapshot JSON NOT NULL,
+    activated_at DATETIME COMMENT '实际激活时间，待激活计划为空',
+    total_amount DECIMAL(12, 2) NOT NULL,
+    installment_count INT NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'PENDING_ACTIVATION' COMMENT 'PENDING_ACTIVATION、ACTIVE、COMPLETED、CANCELLED',
+    generated_by_user_id BIGINT,
+    generated_by_name VARCHAR(64),
+    generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_customer_cashback_plan_no (plan_no),
+    UNIQUE KEY uk_customer_cashback_plan_order (order_id),
+    INDEX idx_customer_cashback_plan_customer (customer_id),
+    INDEX idx_customer_cashback_plan_channel (channel_id),
+    INDEX idx_customer_cashback_plan_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_cashback_installment (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    cashback_plan_id BIGINT NOT NULL,
+    installment_no INT NOT NULL,
+    planned_amount DECIMAL(12, 2) NOT NULL,
+    planned_date DATE NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'PENDING',
+    confirmed_by_user_id BIGINT,
+    confirmed_by_name VARCHAR(64),
+    confirmed_at DATETIME,
+    confirmation_remark VARCHAR(512),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_cashback_installment_sequence (cashback_plan_id, installment_no),
+    INDEX idx_cashback_installment_status_date (status, planned_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS operation_log (

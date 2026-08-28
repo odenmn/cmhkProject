@@ -125,13 +125,35 @@ public class SecondarySettlementServiceImpl implements SecondarySettlementServic
 
     @Override
     public List<SecondaryCommissionRecord> records(AdminPrincipal principal) {
-        return recordMapper.selectList(
+        List<SecondaryCommissionRecord> records = recordMapper.selectList(
                 new LambdaQueryWrapper<SecondaryCommissionRecord>()
                         .eq(
                                 principal != null && "CHANNEL".equals(principal.scopeType()),
                                 SecondaryCommissionRecord::getChannelId,
                                 principal == null ? null : principal.scopeId())
                         .orderByDesc(SecondaryCommissionRecord::getId));
+        if (principal != null && principal.isAdmin()) {
+            return records;
+        }
+        return records.stream()
+                .map(this::maskSensitiveAmounts)
+                .toList();
+    }
+
+    /** 非管理员只看结算流程事实，不返回规则快照及任何金额。 */
+    private SecondaryCommissionRecord maskSensitiveAmounts(SecondaryCommissionRecord source) {
+        SecondaryCommissionRecord target = new SecondaryCommissionRecord();
+        target.setId(source.getId());
+        target.setOrderId(source.getOrderId());
+        target.setChannelId(source.getChannelId());
+        target.setRuleId(source.getRuleId());
+        target.setPromotionApplied(source.getPromotionApplied());
+        target.setStatus(source.getStatus());
+        target.setConfirmedBy(source.getConfirmedBy());
+        target.setConfirmedAt(source.getConfirmedAt());
+        target.setCreatedAt(source.getCreatedAt());
+        target.setUpdatedAt(source.getUpdatedAt());
+        return target;
     }
 
     @Transactional

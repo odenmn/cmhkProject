@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.cmhk.business.module.customer.entity.Customer;
 import com.cmhk.business.module.customer.mapper.CustomerMapper;
+import com.cmhk.business.module.cashback.service.CashbackService;
 import com.cmhk.business.module.mobile.controller.MobilePlanController;
 import com.cmhk.business.module.mobile.dto.MobilePlanOrderCreateRequest;
 import com.cmhk.business.module.mobile.entity.MobilePlan;
@@ -108,6 +109,7 @@ class MobilePlanOrderPrivacyTests {
         CustomerMapper customerMapper = mock(CustomerMapper.class);
         MobilePlanOrderMapper orderMapper = mock(MobilePlanOrderMapper.class);
         OrderStatusHistoryService historyService = mock(OrderStatusHistoryService.class);
+        CashbackService cashbackService = mock(CashbackService.class);
         LambdaQueryChainWrapper<MobilePlan> query = mock(LambdaQueryChainWrapper.class);
 
         Customer customer = new Customer();
@@ -127,7 +129,8 @@ class MobilePlanOrderPrivacyTests {
         MobilePlanOrderServiceImpl service = new MobilePlanOrderServiceImpl(
                 mobilePlanService,
                 customerMapper,
-                historyService);
+                historyService,
+                cashbackService);
         ReflectionTestUtils.setField(service, "baseMapper", orderMapper);
 
         MobilePlanOrderCreateRequest request = new MobilePlanOrderCreateRequest();

@@ -189,7 +189,36 @@ public class AdminCustomerService {
     public Map<String, Object> detail(Long id, AdminPrincipal principal) {
         Customer customer = required(id);
         requireChannelAccess(customer.getChannelId(), principal);
-        return detail(id);
+        Map<String, Object> detail = detail(id);
+        if (principal != null && principal.isAdmin()) {
+            return detail;
+        }
+        Map<String, Object> scopedDetail = new LinkedHashMap<>(detail);
+        Object commissionValue = detail.get("commissionRecords");
+        if (commissionValue instanceof List<?> records) {
+            scopedDetail.put("commissionRecords", records.stream()
+                    .filter(SecondaryCommissionRecord.class::isInstance)
+                    .map(SecondaryCommissionRecord.class::cast)
+                    .map(this::maskCommissionAmounts)
+                    .toList());
+        }
+        return scopedDetail;
+    }
+
+    /** 客户详情对非管理员隐藏佣金金额和规则快照。 */
+    private SecondaryCommissionRecord maskCommissionAmounts(SecondaryCommissionRecord source) {
+        SecondaryCommissionRecord target = new SecondaryCommissionRecord();
+        target.setId(source.getId());
+        target.setOrderId(source.getOrderId());
+        target.setChannelId(source.getChannelId());
+        target.setRuleId(source.getRuleId());
+        target.setPromotionApplied(source.getPromotionApplied());
+        target.setStatus(source.getStatus());
+        target.setConfirmedBy(source.getConfirmedBy());
+        target.setConfirmedAt(source.getConfirmedAt());
+        target.setCreatedAt(source.getCreatedAt());
+        target.setUpdatedAt(source.getUpdatedAt());
+        return target;
     }
 
     private Map<String, Object> detailFromDatabase(Long id) {

@@ -105,6 +105,9 @@ public class MobilePlanOrder {
 
     private LocalDateTime statusUpdatedAt;
 
+    /** 实际激活时间，返现首期在该日满一个月后计划。 */
+    private LocalDateTime activatedAt;
+
     private LocalDate onboardDate;
 
     private LocalDateTime createdAt;

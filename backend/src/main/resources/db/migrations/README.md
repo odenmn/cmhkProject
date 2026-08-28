@@ -30,3 +30,8 @@ P2已执行`V002__standardize_customers_orders_and_products.sql`，标准化客�
 P3使用`V003__resource_pool_and_referral_chains.sql`新增多接龙推荐号码表，并为既有 ICCID 当前绑定补充迁移基线历史；脚本不会自动推断历史接龙关系。
 
 P4使用`V004__operation_tasks.sql`新增运营任务和任务处理历史表；任务只记录内部处理动作，不回写 UMALL、客户、订单或资源外部事实状态。
+
+P5-A使用`V005__cashback_rules_and_plans.sql`新增客户返现规则、计划和期次，并为订单增加实际激活时间；返现易导入、到账及提现事实留待P5后续迁移实现。
+
+P5-A补充迁移`V006__allow_pre_activation_cashback_plans.sql`允许订单在实际激活前先生成待激活返现计划，激活后才生成有计划日期的返现期次。
+执行V006和批量生成前使用`P5_EXISTING_PLANS_PRECHECK.sql`核对已有计划、套餐快照分布和缺失客户关系。

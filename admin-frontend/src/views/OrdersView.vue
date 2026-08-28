@@ -17,9 +17,11 @@ const historyVisible = ref(false)
 const historyRows = ref<any[]>([])
 const taskVisible = ref(false)
 const taskRows = ref<any[]>([])
+const cashbackVisible = ref(false)
+const cashbackRows = ref<any[]>([])
 const editing = ref<any>()
 const filters = reactive<any>({ keyword: '', status: '', customerId: null })
-const empty = () => ({ customerId: null, customerName: '', contactPhone: '', planId: null, planCode: '', planName: '', planType: '', monthlyFee: 0, contractPeriod: '', umallOrderNo: '', serviceNumber: '', reviewStatus: '', supplementStatus: '', activationStatus: '', contractStatus: '', umallStatus: '', orderSource: 'ADMIN', status: 'PENDING', reconciliationStatus: '待对账' })
+const empty = () => ({ customerId: null, customerName: '', contactPhone: '', planId: null, planCode: '', planName: '', planType: '', monthlyFee: 0, contractPeriod: '', umallOrderNo: '', serviceNumber: '', reviewStatus: '', supplementStatus: '', activationStatus: '', activatedAt: null, contractStatus: '', umallStatus: '', orderSource: 'ADMIN', status: 'PENDING', reconciliationStatus: '待对账' })
 const form = reactive<any>(empty())
 
 async function load() {
@@ -78,6 +80,16 @@ async function openTasks(row: any) {
   }
 }
 
+/** 查询订单的返现计划，金额由服务端按角色脱敏。 */
+async function openCashbacks(row: any) {
+  try {
+    cashbackRows.value = await api.cashbackPlans({ orderId: row.id }) as any[]
+    cashbackVisible.value = true
+  } catch (error: any) {
+    ElMessage.error(error.message)
+  }
+}
+
 async function save() {
   try {
     if (editing.value) await api.updateOrder(editing.value.id, form)
@@ -128,7 +140,7 @@ onMounted(load)
           <el-table-column prop="reviewStatus" label="审核" width="80"/>
           <el-table-column prop="activationStatus" label="激活" width="80"/>
           <el-table-column prop="reconciliationStatus" label="对账" width="80"/>
-          <el-table-column label="操作" width="155"><template #default="scope"><el-button link type="primary" @click="open(scope.row)">编辑</el-button><el-button link @click="openHistory(scope.row)">历史</el-button><el-button link @click="openTasks(scope.row)">任务</el-button></template></el-table-column>
+          <el-table-column label="操作" width="200"><template #default="scope"><el-button link type="primary" @click="open(scope.row)">编辑</el-button><el-button link @click="openHistory(scope.row)">历史</el-button><el-button link @click="openTasks(scope.row)">任务</el-button><el-button link @click="openCashbacks(scope.row)">返现</el-button></template></el-table-column>
         </el-table>
       </div>
     </div>
@@ -147,6 +159,7 @@ onMounted(load)
           <el-col :span="8"><el-form-item label="审核状态"><el-select v-model="form.reviewStatus" clearable style="width:100%"><el-option v-for="item in reviewStatusOptions" :key="item.value" :label="item.label" :value="item.value"/></el-select></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="补件状态"><el-select v-model="form.supplementStatus" clearable style="width:100%"><el-option v-for="item in supplementStatusOptions" :key="item.value" :label="item.label" :value="item.value"/></el-select></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="激活状态"><el-select v-model="form.activationStatus" clearable style="width:100%"><el-option v-for="item in activationStatusOptions" :key="item.value" :label="item.label" :value="item.value"/></el-select></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="实际激活时间"><el-date-picker v-model="form.activatedAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" clearable style="width:100%" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="合约状态"><el-input v-model="form.contractStatus"/></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="对账状态"><el-input v-model="form.reconciliationStatus"/></el-form-item></el-col>
         </el-row>
@@ -155,6 +168,7 @@ onMounted(load)
     </el-dialog>
     <el-drawer v-model="historyVisible" title="订单状态历史" size="620px"><el-table :data="historyRows"><el-table-column prop="createdAt" label="时间" width="175"/><el-table-column prop="statusType" label="状态类型" width="130"/><el-table-column prop="beforeStatus" label="变更前" min-width="120"/><el-table-column prop="afterStatus" label="变更后" min-width="120"/><el-table-column prop="sourceType" label="来源" width="110"/><el-table-column prop="operatorName" label="操作人" width="100"/></el-table></el-drawer>
     <el-drawer v-model="taskVisible" title="关联任务" size="620px"><el-table :data="taskRows"><el-table-column prop="task.taskNo" label="任务编号" width="140"/><el-table-column prop="task.title" label="标题" min-width="170"/><el-table-column prop="task.taskStatus" label="状态" width="110"/><el-table-column prop="task.assigneeName" label="负责人" width="110"/></el-table></el-drawer>
+    <el-drawer v-model="cashbackVisible" title="关联返现计划" size="620px"><el-table :data="cashbackRows"><el-table-column prop="cashbackPlan.planNo" label="计划编号" width="130"/><el-table-column prop="cashbackPlan.activatedAt" label="实际激活时间" width="175"/><el-table-column prop="cashbackPlan.installmentCount" label="期数" width="80"/><el-table-column prop="cashbackPlan.totalAmount" label="计划总额" width="110"/><el-table-column prop="cashbackPlan.status" label="状态" width="100"/></el-table></el-drawer>
   </div>
 </template>
 

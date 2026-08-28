@@ -3,6 +3,7 @@ package com.cmhk.business.module.admin.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cmhk.business.common.cache.CacheClient;
 import com.cmhk.business.module.admin.security.AdminPrincipal;
+import com.cmhk.business.module.cashback.service.CashbackService;
 import com.cmhk.business.module.customer.entity.Customer;
 import com.cmhk.business.module.customer.mapper.CustomerMapper;
 import com.cmhk.business.module.mobile.entity.MobilePlanOrder;
@@ -31,6 +32,7 @@ public class AdminOrderService {
     private final OrderStatusHistoryMapper historyMapper;
     private final MobilePlanMapper planMapper;
     private final OperationTaskService taskService;
+    private final CashbackService cashbackService;
     private final JavaType orderListType;
     private final JavaType orderType;
 
@@ -42,6 +44,7 @@ public class AdminOrderService {
             OrderStatusHistoryMapper historyMapper,
             MobilePlanMapper planMapper,
             OperationTaskService taskService,
+            CashbackService cashbackService,
             ObjectMapper objectMapper) {
         this.mapper = mapper;
         this.customerMapper = customerMapper;
@@ -50,6 +53,7 @@ public class AdminOrderService {
         this.historyMapper = historyMapper;
         this.planMapper = planMapper;
         this.taskService = taskService;
+        this.cashbackService = cashbackService;
         this.orderListType = objectMapper.getTypeFactory()
                 .constructCollectionType(List.class, MobilePlanOrder.class);
         this.orderType = objectMapper.getTypeFactory()
@@ -133,6 +137,7 @@ public class AdminOrderService {
         }
         input.setStatus(targetStatus);
         MobilePlanOrder saved = save(id, input, principal.username());
+        applyActivatedAt(before, saved, input);
         if (before == null || !targetStatus.equals(before.getStatus())) {
             saved.setStatusUpdatedAt(LocalDateTime.now());
             mapper.updateById(saved);
@@ -144,7 +149,34 @@ public class AdminOrderService {
         recordFieldHistory(saved.getId(), "ACTIVATION", before == null ? null : before.getActivationStatus(), saved.getActivationStatus(), principal);
         recordFieldHistory(saved.getId(), "CONTRACT", before == null ? null : before.getContractStatus(), saved.getContractStatus(), principal);
         taskService.ensureTasksForOrderStatus(before, saved, principal);
+        cashbackService.ensurePlanForOrder(saved, principal);
         return saved;
+    }
+
+    /** 保存明确录入的激活时间，并在首次标记为已激活时记录当前事实时间。 */
+    private void applyActivatedAt(
+            MobilePlanOrder before,
+            MobilePlanOrder saved,
+            MobilePlanOrder input) {
+        if (input.getActivatedAt() != null) {
+            if (!isActivated(saved)) {
+                throw new IllegalArgumentException("实际激活时间只能用于已激活或已完成订单");
+            }
+            saved.setActivatedAt(input.getActivatedAt());
+            mapper.updateById(saved);
+            return;
+        }
+        if (!isActivated(before) && isActivated(saved) && saved.getActivatedAt() == null) {
+            saved.setActivatedAt(LocalDateTime.now());
+            mapper.updateById(saved);
+        }
+    }
+
+    private boolean isActivated(MobilePlanOrder order) {
+        return order != null
+                && (OrderStatusCode.ACTIVATED.name().equals(order.getStatus())
+                || OrderStatusCode.COMPLETED.name().equals(order.getStatus())
+                || "已激活".equals(order.getActivationStatus()));
     }
 
     /** 记录统一办理状态变化，不回写历史记录。 */

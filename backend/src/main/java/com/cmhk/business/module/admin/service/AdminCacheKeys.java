@@ -14,6 +14,7 @@ public final class AdminCacheKeys {
     public static final String ICCIDS = "cmhk:admin:iccids:";
     public static final String RESOURCES = "cmhk:admin:resources:";
     public static final String TASKS = "cmhk:admin:tasks:";
+    public static final String CASHBACKS = "cmhk:admin:cashbacks:";
 
     private AdminCacheKeys() {
     }

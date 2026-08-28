@@ -49,6 +49,9 @@ public class AdminPermissionPolicy {
         if (path.startsWith("/api/admin/secondary/rules") && !HttpMethod.GET.matches(method)) {
             return true;
         }
+        if (path.startsWith("/api/admin/cashbacks") && !HttpMethod.GET.matches(method)) {
+            return true;
+        }
         if (path.matches("/api/admin/secondary/records/\\d+/(adjust|confirm)")) {
             return true;
         }
